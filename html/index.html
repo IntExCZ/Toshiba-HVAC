@@ -1,0 +1,245 @@
+<html>
+	<head>
+		<title>Toshiba Control</title>
+		<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+		<meta http-equiv="Pragma" content="no-cache" />
+		<meta http-equiv="Expires" content="0" />
+		<meta name="viewport" content="initial-scale=0.35, maximum-scale=0.35, minimum-scale=0.35">
+		<link rel="shortcut icon" href="favicon.ico" />
+		<style>
+			* {margin:0px; padding:0px; font-family:sans-serif; color:white;font-size:1.1em}
+			body {display:table;height:100%;margin:auto;background-color:#0452af;}
+			#wrapper {display:table-cell;vertical-align:middle;}
+			#main_box{width:1000px;}
+			#title {text-align:center;margin-bottom:15px;font-size:2em;text-transform:uppercase;}
+			#main_table {width:100%;background-color:#23272c;padding:20px;border-radius:10px;}
+			#main_table tr {height:65px;}
+			#main_table td {padding:5px;}
+			#main_table .state_name {width:auto;padding-left:30px}
+			#main_table .state_value {text-align:left;}
+			#main_table .state_set {width:0px;text-align:left;padding-right:30px}
+			.state_value {font-weight:bold;}
+			select,input,option {color:black}
+			select {width:193px}
+			#TEMP_PRESET_input {width:80px;margin-right:15px;text-align:center;width:80px;}
+			#SET_button {display:inline}
+			input[type="button"] {padding-left:10px;padding-right:10px}
+			#get_all_button {text-align:center;padding-top:15px !important;font-size:0.9em;}
+			#get_all_button input {font-weight:normal;text-transform:uppercase}
+			#hvac_selection {text-align:center;padding-bottom:20px !important}
+			#hvac_selection #hvac {text-align:center; width:370px;text-transform:uppercase;font-weight:bold;font-size:1.2em}
+			.loader {border: 10px solid transparent;border-radius:50%;border-top:10px solid #3498db;width:20px;height:20px;animation: spinner 0.6s linear infinite;}
+			@keyframes spinner {0% {transform: rotate(0deg);} 100% {transform: rotate(360deg);}}
+			.saver {width:20px;height:20px;position:relative;top:-12px}
+			.saver span {animation: fader 0.8s both infinite;color:#3498db;}
+			.saver span:nth-child(2) {animation-delay: .1s;}
+			.saver span:nth-child(3) {animation-delay: .2s;}
+			@keyframes fader {0% {opacity: 0;} 20% {opacity: 1;} 100% {opacity: 0;}}
+		</style>
+		<script src="jquery.min.js"></script>
+		<script>
+			var controls_enabled = true;
+			var hvac;
+			var request;
+			var startTime, endTime;
+			var debug_mode = false;
+			var debug_mode_message = "API is in DEBUG mode!";
+			
+			// Start runtime timer
+			function timer_start() {
+				startTime = new Date();
+			};
+			
+			// Stop runtime timer
+			function timer_stop() {
+				endTime = new Date();
+				var timeDiff = endTime - startTime; //in ms
+				var seconds = timeDiff / 1000;
+				console.log("Operation taken " + seconds + " seconds.");
+			}
+			
+			// Read state and set values to fields
+			function process_state_results(data) {
+				timer_stop();
+				if (data.includes('DEBUG_MODE')) {
+					console.log(data); // show RAW data in console
+					debug_mode = true;
+					$('.state_value').html('[X]').css('color', 'red');
+					disable_controls(false);			
+					alert(debug_mode_message);
+					return;
+				}
+				debug_mode = false;
+				data = JSON.parse(data);
+				$.each(data, function(key, val) {
+					console.log(key + ": " + val);
+					$('#' + key).html(val); // show value in appropriate field
+				});
+				$('.state_set select').val("-"); // reset select boxes
+				disable_controls(false);
+			}
+			
+			// Get all state values
+			function get_all_states() {
+				console.log("Try to get all states...");
+				disable_controls();
+				$('.state_value').html('<div class="loader"></div>').css('color', 'yellow');
+				timer_start();
+				request = $.ajax({
+					type: 'GET',
+					url: '/control.php?' + hvac + '&getstate',
+					success: process_state_results,
+					error: function() { state_failed(); }
+				});
+			}
+			
+			// Get desired state value
+			function get_state(name) {
+				console.log("Try to get state '" + name + "'...");
+				if (!controls_enabled) {
+					console.log('Controls are disabled!');
+					return false;
+				}
+				disable_controls();
+				//$('#' + name).html('...').css('color', 'lime');
+				$('#' + name).html('<div class="loader"></div>').css('color', 'lime');
+				timer_start();
+				request = $.ajax({
+					type: 'GET',
+					url: '/control.php?' + hvac + '&getstate=' + name,
+					success: process_state_results,
+					error: function() { state_failed(name); }
+				});
+			}
+			
+			// Set desired state
+			function set_state(name, value) {
+				if (value == '-' && !(name == 'SPECIAL_MODE')) // SPECIAL_MODE has "-" state
+					return;
+				console.log("Setting state '" + name + "' to value '" + value + "'...");
+				disable_controls(true);
+				$('#' + name).html("<div class='saver'><span>></span><span>></span><span>></span></div>").css('color', 'cyan');
+				request = $.ajax({
+					type: 'GET',
+					url: '/control.php?' + hvac + '&sendcmd=' + name + '&cmdval=' + value,
+					success: function() { 
+						disable_controls(false); 
+						get_state(name); // get real state
+					},
+					error: function() { state_failed(name); }
+				});
+			}		
+			
+			// Load values into select boxes
+			function fill_enums(data) {
+				if (data === undefined) {
+					console.log("Try to get mode enums...");
+					timer_start();
+					jQuery.get('/control.php?getstate=enum', fill_enums);
+					return;
+				}
+				timer_stop();
+				console.log(data);
+				if (data.includes('DEBUG_MODE')) {
+					debug_mode = true;
+					data = data.replace('DEBUG_MODE', '');
+					$('.state_value').html('[X]').css('color', 'red');
+					alert(debug_mode_message);
+				}
+				data = JSON.parse(data);
+				console.log(data);			
+				$.each(data, function(state_name, state_opts) {
+					if (state_opts == null)
+						return;
+					$.each(state_opts, function(opt_val, opt_name) {
+						$('#' + state_name + "_select").append($('<option>', {
+							value: opt_name,
+							text: opt_name
+						}));
+					});	
+				});
+				
+			}
+			
+			// HVAC seletion box
+			function select_hvac(selection) {
+				if (debug_mode) {
+					$('.state_value').html('[X]').css('color', 'red');
+					alert(debug_mode_message);
+					return;
+				}					
+				try {
+					request.abort();
+					console.log('Running request aborted.');
+				} catch (err) {}
+				$('.state_value').html('');
+				$('.state_set select').val('-');
+				hvac = selection;
+				disable_controls(false);
+			}
+			
+			// Disable all controls during running request
+			function disable_controls(disable = true) {
+				if (disable) {
+					controls_enabled = false;
+					// row controls
+					$('.state').find('*').attr('disabled', 'disabled');
+					// get state button
+					$('#btn_get_all_states').attr('disabled', 'disabled');
+				} else {
+					controls_enabled = true;
+					$('.state').find('*').removeAttr('disabled');
+					// buttons
+					$('#btn_get_all_states').removeAttr('disabled');
+				}
+			}
+			
+			// Restore controls after failed request
+			function state_failed(name = false) {
+				if (name) {
+					console.log("Error processing value for '" + name + "'!");
+					$('#' + name).html('[X]').css('color', 'red');
+				} else {
+					console.log('Error processing values!');
+					$('.state_value').html('[X]').css('color', 'red');
+				}
+				disable_controls(false);
+			}
+			
+			$(document).ready(function() {
+				hvac = $('#hvac').val();
+				fill_enums(); // load values into select boxes
+			});
+			
+		</script>
+	</head>
+	<body>
+		<div id="wrapper">
+			<div id="main_box">
+				<h1 id="title" onclick="location.reload()">Toshiba Control</h1>
+				<table id="main_table">
+					<tr>
+						<td colspan="3" id="hvac_selection">
+							<select id="hvac" onchange="select_hvac($(this).val())">
+								<option value="host=192.168.0.101&username=admin&password=pswd123">Pracovna</option>
+								<option value="host=192.168.0.102&username=admin&password=pswd123">Obyvak</option>
+								<option value="host=192.168.0.103&username=admin&password=pswd123">Loznice</option>
+								<option value="host=192.168.0.104&username=admin&password=pswd123">Velky_pokoj</option>
+							</select>
+						</td>
+					</tr>
+					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">Power state:</td><td width="25%" class="state_value" id="POWER_STATE" onclick="get_state($(this).attr('id'))"></td><td class="state_set"><select id="POWER_STATE_select" state="POWER_STATE" onchange="set_state($(this).attr('state'), $(this).val())"></select></td></tr>
+					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">Power selection:</td><td class="state_value" id="POWER_SEL" onclick="get_state($(this).attr('id'))"></td><td class="state_set"><select id="POWER_SEL_select" state="POWER_SEL" onchange="set_state($(this).attr('state'), $(this).val())"><option value="-">-</option></select></td></tr>
+					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">Unit mode:</td><td class="state_value" id="UNIT_MODE" onclick="get_state($(this).attr('id'))"></td><td class="state_set"><select id="UNIT_MODE_select" state="UNIT_MODE" onchange="set_state($(this).attr('state'), $(this).val())"></select></td></tr>
+					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">Special mode:</td><td class="state_value" id="SPECIAL_MODE" onclick="get_state($(this).attr('id'))"></td><td class="state_set"><select id="SPECIAL_MODE_select" state="SPECIAL_MODE" onchange="set_state($(this).attr('state'), $(this).val())" onfocus="this.selectedIndex = -1;"></select></td></tr>
+					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">FAN mode:</td><td class="state_value" id="FAN_MODE" onclick="get_state($(this).attr('id'))"></td><td class="state_set"><select id="FAN_MODE_select" state="FAN_MODE" onchange="set_state($(this).attr('state'), $(this).val())"></select></td></tr>
+					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">Swing state:</td><td class="state_value" id="SWING_STATE" onclick="get_state($(this).attr('id'))"></td class="state_set"><td class="state_set"><select id="SWING_STATE_select" state="SWING_STATE" onchange="set_state($(this).attr('state'), $(this).val())"></select></td></tr>
+					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">Preset temperature:</td><td class="state_value" id="TEMP_PRESET" onclick="get_state($(this).attr('id'))"></td><td class="state_set"><input type="number" value="22" id="TEMP_PRESET_input"></select><input type="button" value="SET" id="SET_button" onclick="set_state('TEMP_PRESET', $('#TEMP_PRESET_input').val())"></td></tr>
+					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">Indoor temperature:</td><td class="state_value" id="TEMP_INDOOR" onclick="get_state($(this).attr('id'))"></td><td class="state_set"></td></tr>
+					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">Outdoor temperature:</td><td class="state_value" id="TEMP_OUTDOOR" onclick="get_state($(this).attr('id'))"></td><td class="state_set"></td></tr>
+					<tr><td id="get_all_button" colspan="3"><input type="button" id="btn_get_all_states" value="Get all states" onclick="get_all_states()" /></td></tr>
+				</table>
+			</div>
+		</div>
+	</body>
+</html>
