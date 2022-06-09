@@ -18,6 +18,7 @@
 	*/
 
 	$debug_mode = false;
+	$admin = 'IntEx';
 
 	/* Function constants (decimal) */
 	$function_codes['TEMP_PRESET']	= '179'; // 17-32 degrees
@@ -37,7 +38,7 @@
 	$function_values['SWING_STATE'] 	= array('0' => '-', '49' => 'OFF', '65' => 'ON');
 	$function_values['UNIT_MODE']		= array('0' => '-', '65' => 'AUTO', '66' => 'COOL', '67' => 'HEAT', '68' => 'DRY', '69' => 'FAN');
 	$function_values['POWER_SEL']		= array('50' => '50%', '75' => '75%', '100' => '100%');
-	$function_values['SPECIAL_MODE']	= array('0' => '-', '1' => 'HIPOWER', '3' => 'ECO/CFTSLP', '4' => '8C', '2' => 'SILENT-1', '10' => 'SILENT-2', '32' => 'FRPL1', '48' => 'FRPL2');
+	$function_values['SPECIAL_MODE']	= array('0' => '-', '1' => 'HIPOWER', '3' => 'ECO/CTSP', '4' => '8C', '2' => 'SILENT-1', '10' => 'SILENT-2', '32' => 'FRPL1', '48' => 'FRPL2'); // CTSP = Comfort Sleep
 	$function_values['TIMER_ON']		= array('65' => 'ON', '66' => 'OFF');
 	$function_values['TIMER_OFF']		= array('65' => 'ON', '66' => 'OFF');
 	
@@ -99,12 +100,12 @@
 		// query/command response variables updating (store query response in Var2, store command response in Var3)
 		tasmota_send('Rule2 ON SerialReceived#Data$<0200039000000901300100000002 DO Var2 %value% ENDON ON SerialReceived#Data$<0200039000000801300100000001 DO Var3 %value% ENDON');
 		tasmota_send('Rule2 1');
-		// AC init (handshake + aftershake) on WiFi connected (SerialConfig = Wemos D1 Mini Pro restart workaround)
+		// HVAC init (handshake + aftershake) on WiFi connected (SerialConfig = Wemos D1 Mini Pro restart workaround)
 		tasmota_send('Rule3 ON Wifi#Connected DO Backlog SerialConfig 8O1; SerialConfig 8E1; Delay 10; SerialSend5 02FFFF0000000002; SerialSend5 02FFFF0100000102FE; SerialSend5 020000000000020202FA; SerialSend5 0200018101000200007B; SerialSend5 020001020000020000FB; SerialSend5 02000200000000FE; Delay 20; SerialSend5 020002010000020000FB; SerialSend5 020002020000020000FA ENDON');
 		tasmota_send('Rule3 1');
 	}
 
-	// Convert received temperature from AC (to positive/negative value)
+	// Convert received temperature from HVAC (to positive/negative value)
 	// returns: signed decimal value
 	function convert_temperature($input_temperature) {
 		if ($input_temperature == 127)
@@ -116,7 +117,7 @@
 
 	// Calculate checksum for command
 	// returns: HEX checksum
-	function ac_checksum($input_command) {
+	function hvac_checksum($input_command) {
 		$command_array = str_split($input_command, 2); // convert to array
 		array_shift($command_array); // remove start byte (02)
 		$command_array = array_map('hexdec', $command_array); // convert to decimals
@@ -126,9 +127,9 @@
 		return $checksum;
 	}
 
-	// Send Handshake + aftershake to AC
+	// Send Handshake + aftershake to HVAC
 	// returns: none
-	function ac_init() {
+	function hvac_init() {
 		$command = [];
 		array_push($command, 'SerialSend5 02FFFF0000000002');
 		array_push($command, 'SerialSend5 02FFFF0100000102FE');
@@ -143,32 +144,33 @@
 		sleep(2);
 	} 
 
-	// Send command to AC (with result check+retry)
-	// example: ac_command('POWER_STATE', 'ON');
+	// Send command to HVAC (with result check+retry)
+	// example: hvac_command('POWER_STATE', 'ON');
 	// returns: true/false (command success/fail)
-	$ac_command_retries = []; // command retries log
-	function ac_command($input_function, $input_value, $num_retries = 4, $retry_counter = 0, $response_only = false) {
+	$hvac_command_retries = []; // command retries log
+	function hvac_command($input_function, $input_value, $num_retries = 4, $retry_counter = 0, $response_only = false) {
 		global $function_codes, $function_values;
-		global $ac_command_retries;
-		$control_command_prefix = '020003100000070130010002';
+		global $hvac_command_retries;
+		$original_input_value = $input_value; // for eventual retry
+        $control_command_prefix = '020003100000070130010002';
 		$command_result_variable = 'Var3';
 		if (!$response_only) {
 			if ($input_function == 'SPECIAL_MODE' && strpos($input_value, 'SILENT') !== false)
-				ac_command('POWER_SEL', '100%', $num_retries, $retry_counter); // set maximum power in silent mode (same as over IR)
+				hvac_command('POWER_SEL', '100%', $num_retries, $retry_counter); // set maximum power in silent mode (same as over IR)
 			// prepare command
 			$control_command = $control_command_prefix;
 			$control_command .= to_hex($function_codes[$input_function]); // function code
 			if ($input_function != 'TEMP_PRESET')
 				$input_value = array_search($input_value, $function_values[$input_function]);
 			$control_command .= to_hex($input_value); // value
-			$control_command .= ac_checksum($control_command);
+			$control_command .= hvac_checksum($control_command);
 			// send command
 			$command = [];
 			array_push($command, $command_result_variable." ".$input_function); // clear command result variable (set function code for console debug)
 			array_push($command, 'SerialSend5 '.$control_command); // query command (prefix + query code + checksum)
 			tasmota_send($command);
 		}
-		usleep(500000); // time for AC response (500 ms)
+		usleep(500000); // time for HVAC response (500 ms)
 		// get response
 		$response = tasmota_send($command_result_variable); // get query result variable
 		$response = json_decode($response); // convert to JSON object {"Var2":"02000390000008013001000000018017"}
@@ -181,33 +183,33 @@
 			if ($retry_counter == $num_retries)
 				return false; // no more retries
 			$retry_counter++;
-			array_push($ac_command_retries, $input_function.": ".$retry_counter.". retry");
-			return ac_command($input_function, $input_value, $num_retries, $retry_counter, $retry_counter%2 == 1); // even retry = retry whole command, odd retry = re-read response
+			array_push($hvac_command_retries, $input_function.": ".$retry_counter.". retry");
+			return hvac_command($input_function, $original_input_value, $num_retries, $retry_counter, $retry_counter%2 == 1); // even retry = retry whole command, odd retry = re-read response
 		}
 		return true;
 	}
 
-	// Query AC state (with result check+retry)
+	// Query HVAC state (with result check+retry)
 	// returns: decimal temperature/translated value/
-	$ac_query_retries = []; // query retries log
+	$hvac_query_retries = []; // query retries log
 	$ac_state_valid = true; // query validity flag (if all states were retrieived)
-	function ac_query($input_function, $num_retries = 4, $retry_counter = 0, $response_only = false) {
+	function hvac_query($input_function, $num_retries = 4, $retry_counter = 0, $response_only = false) {
 		global $function_codes, $function_values;
-		global $ac_query_retries, $ac_state_valid;
+		global $hvac_query_retries, $ac_state_valid;
 		$query_command_prefix = '020003100000060130010001';
 		$query_result_variable = 'Var2';
 		if (!$response_only) {
 			// prepare query
 			$query_command = $query_command_prefix;
 			$query_command .= to_hex($function_codes[$input_function]); // ex. 020003100000060130010001+BB (room temp)
-			$query_command .= ac_checksum($query_command); // ex. 020003100000060130010001BB+F9 (checksum)
+			$query_command .= hvac_checksum($query_command); // ex. 020003100000060130010001BB+F9 (checksum)
 			// send query
 			$command = [];
 			array_push($command, $query_result_variable." ".$input_function); // clear query result variable (set function code for console debug)
 			array_push($command, 'SerialSend5 '.$query_command); // query command (prefix + query code + checksum)
 			tasmota_send($command);
 		}
-		usleep(500000); // time for AC response (500 ms)
+		usleep(500000); // time for HVAC response (500 ms)
 		// get response
 		$response = tasmota_send($query_result_variable); // get query result variable
 		$response = json_decode($response); // convert to JSON object {"Var2":"0200039000000901300100000002BB17"}
@@ -222,8 +224,8 @@
 				return false; // no more retries
 			}
 			$retry_counter++;
-			array_push($ac_query_retries, $input_function.": ".$retry_counter.". retry");
-			return ac_query($input_function, $num_retries, $retry_counter, $retry_counter%2 == 1); // even retry = retry whole query, odd retry = re-read response
+			array_push($hvac_query_retries, $input_function.": ".$retry_counter.". retry");
+			return hvac_query($input_function, $num_retries, $retry_counter, $retry_counter%2 == 1); // even retry = retry whole query, odd retry = re-read response
 		}
 		// parse response
 		$result = substr($response, strlen($query_response_prefix), 2); // value length = 2
@@ -249,7 +251,7 @@
 		if (!$getstate) {
 			// all states
 			foreach ($function_codes as $key => $value) {
-				$states[$key] = ac_query($key);
+				$states[$key] = hvac_query($key);
 			}
 		} else {
 			$getstate = strtoupper($getstate);
@@ -267,12 +269,12 @@
 						$ac_state_valid = false;
 						$states[$state] = false;
 					} else 
-						$states[$state] = ac_query($state);
+						$states[$state] = hvac_query($state);
 				}
 			}
 		}
-		header("AC-State-Valid: ".($ac_state_valid ? '1' : '0'));
-		header("AC-Query-Retries: ".implode(', ', $ac_query_retries));
+		header("HVAC-State-Valid: ".($ac_state_valid ? '1' : '0'));
+		header("HVAC-Query-Retries: ".implode(', ', $hvac_query_retries));
 		echo json_encode($states);
 		exit;
 	} 
@@ -282,17 +284,29 @@
 	$cmdval = isset($_GET['cmdval']) ? $_GET['cmdval'] : -1;
 	$cmdresult = [];
 	if ($sendcmd != -1 && $cmdval != -1) {
+		if (strtolower($_SERVER['REMOTE_USER']) != strtolower($admin)) {
+			header('HTTP/1.0 403 Forbidden');
+			die("Action not permitted!");
+		}
 		$sendcmd = strtoupper($sendcmd);
 		$cmdval = strtoupper($cmdval);
 		if ($sendcmd == 'TEMP_PRESET') {
-			$cmdresult[$sendcmd.':'.$cmdval] = !is_numeric($cmdval) ? 'INVALID_TEMP' : ac_command($sendcmd, $cmdval);
+			$cmdresult[$sendcmd.':'.$cmdval] = !is_numeric($cmdval) ? 'INVALID_TEMP' : hvac_command($sendcmd, $cmdval);
 		} else {
-			if (!array_key_exists($sendcmd, $function_values)) 
-				$cmdresult[$sendcmd] = 'UNKNOWN_COMMAND';
-			else
-				$cmdresult[$sendcmd.':'.$cmdval] = !is_numeric(array_search($cmdval, $function_values[$sendcmd])) ? 'INVALID_VALUE' : ac_command($sendcmd, $cmdval);
-		}
-		header("AC-Command-Retries: ".implode(', ', $ac_command_retries));
+			if (!array_key_exists($sendcmd, $function_values)) {
+				if (is_numeric($sendcmd)) {
+                    // manual command number
+                    $cmdresult[$sendcmd.':'.$cmdval] = hvac_command($sendcmd, $cmdval);
+                } else {
+                    // command not known
+                    $cmdresult[$sendcmd] = 'UNKNOWN_COMMAND';
+                }
+			} else {
+                // known command
+				$cmdresult[$sendcmd.':'.$cmdval] = !is_numeric(array_search($cmdval, $function_values[$sendcmd])) ? 'INVALID_VALUE' : hvac_command($sendcmd, $cmdval);
+		    }
+        }
+		header("AC-Command-Retries: ".implode(', ', $hvac_command_retries));
 		echo json_encode($cmdresult);
 		exit;
 	}
@@ -319,16 +333,16 @@
 			asort($function_codes);
 			foreach ($function_codes as $key => $value) {			
 				$show_key = ($value != $key) ? $value." (".$key.")" : $key;
-				$states[$show_key] = ac_query($key, $numretries); // defined number of retries or 1
+				$states[$show_key] = hvac_query($key, $numretries); // defined number of retries or 1
 			}
 		} else {
 			$debugstate = strtoupper($debugstate);
 			if (!array_key_exists($debugstate, $function_codes))
 				$function_codes[$debugstate] = $debugstate; // add requested key to function codes
-			$states[$debugstate] = ac_query($debugstate, $numretries); // defined number of retries or 1
+			$states[$debugstate] = hvac_query($debugstate, $numretries); // defined number of retries or 1
 		}
-		header("AC-State-Valid: ".($ac_state_valid ? '1' : '0'));
-		header("AC-Query-Retries: ".implode(', ', $ac_query_retries));
+		header("HVAC-State-Valid: ".($ac_state_valid ? '1' : '0'));
+		header("HVAC-Query-Retries: ".implode(', ', $hvac_query_retries));
 		foreach ($states as $key => $value) {
 			echo "$key: $value"."\n";
 		}
