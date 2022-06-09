@@ -1,0 +1,46 @@
+---
+unit1_hvac:
+  module: toshiba-hvac
+  class: Toshiba_HVAC
+  pin_app: false # independent threading (for immediate state setting)
+  log: toshiba-hvac_log
+  room_name: "Unit 1"
+  tasmota_host: "192.168.1.101"
+  tasmota_password: "12345"
+  full_polling_sec: 50 # all values refresh timer (disabled: 0/false)
+  temps_polling_sec: 20 # temperatures refresh timer (disabled: 0/false)
+  set_log: true # value setting logging
+  debug_log: false # app operations logging
+  hvac_log: false # HVAC operations logging
+  tasmota_log: false # Tasmota communication logging
+
+unit2_hvac:
+  module: toshiba-hvac
+  class: Toshiba_HVAC
+  pin_app: false # independent threading (for immediate state setting)
+  log: toshiba-hvac_log
+  room_name: "Unit 2"
+  tasmota_host: "192.168.1.102"
+  tasmota_password: "12345"
+  full_polling_sec: 50 # all values refresh timer (disabled: 0/false)
+  temps_polling_sec: 20 # temperatures refresh timer (disabled: 0/false)
+  set_log: true # value setting logging
+  debug_log: false # app operations logging
+  hvac_log: false # HVAC operations logging
+  tasmota_log: false # Tasmota communication logging
+
+unit3_hvac:
+  module: toshiba-hvac
+  class: Toshiba_HVAC
+  pin_app: false # independent threading (for immediate state setting)
+  log: toshiba-hvac_log
+  room_name: "Unit 3"
+  tasmota_host: "192.168.1.103"
+  tasmota_password: "12345"
+  full_polling_sec: 50 # all values refresh timer (disabled: 0/false)
+  temps_polling_sec: 20 # temperatures refresh timer (disabled: 0/false)
+  set_log: true # value setting logging
+  debug_log: false # app operations logging
+  hvac_log: false # HVAC operations logging
+  tasmota_log: false # Tasmota communication logging
+  
