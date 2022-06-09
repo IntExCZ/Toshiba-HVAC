@@ -1,0 +1,66 @@
+type: vertical-stack
+cards:
+  - type: custom:collapsable-cards
+    title: "Pracovna HVAC"
+    buttonStyle: |
+      font-size:24px; 
+      background: var(--ha-card-background, var(--card-background-color, white));
+      padding-top: 10px !important;
+      padding-bottom: 10px !important;
+    defaultOpen: false
+    cards:
+      - type: entities
+        entities:
+          - entity: switch.pracovna_hvac_power_state
+            name: Power state
+            secondary_info: last-changed
+          - entity: binary_sensor.pracovna_hvac_connection_state
+            name: Connection state
+            secondary_info: last-changed
+          - entity: sensor.pracovna_hvac_last_refresh
+            name: Last full refresh
+            secondary_info: last-changed
+          - entity: button.pracovna_hvac_refresh
+            name: Refresh all states
+            secondary_info: last-changed
+          - entity: sensor.pracovna_hvac_log_message
+            name: Log message
+            secondary_info: last-changed
+    card_mod:
+      style: |
+        ha-icon { margin-top: -3px }
+        .card-content { padding-top:13px; padding-bottom:13px }
+        @media (max-width: 1500px) {
+          .card-content { padding-top:5px !important; padding-bottom:5px !important } 
+          ha-card button { font-size:20px !important; } 
+        }
+  - type: horizontal-stack
+    cards:
+      - type: thermostat
+        entity: climate.pracovna
+        name: ' '
+        style: |
+          #info { padding-bottom:6px !important }
+          #controls { padding-top:5px !important }
+          .set-value { fill: var(--mode-color); }
+          #set-mode { fill: var(--primary-text-color) !important }
+      - type: entities
+        entities:
+          - entity: sensor.pracovna_hvac_temp_outdoor
+            name: Outdoor
+            secondary_info: last-changed
+          - entity: select.pracovna_hvac_fan_mode
+            name: FAN mode
+            style: |
+              ha-select { width: 83% !important}
+          - entity: switch.pracovna_hvac_swing_state
+            name: Swing
+          - entity: select.pracovna_hvac_special_mode
+            name: Special mode
+            style: |
+              ha-select { width: 83% !important}
+          - entity: number.pracovna_hvac_power_sel
+            name: Power sel.
+        card_mod:
+          style: |
+            #states { padding-left: 5px; padding-bottom:10px }
