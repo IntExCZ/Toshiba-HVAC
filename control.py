@@ -6,9 +6,9 @@ import json
 debug = False
 
 # Tasmota parametes
-tasmota_host = '192.168.0.101'
+tasmota_host = '192.168.1.101'
 tasmota_username = 'admin'
-tasmota_password = 'pswd123'
+tasmota_password = '12345'
 
 ## Function constants (decimal) ##
 function_codes = {}
@@ -30,7 +30,7 @@ function_values['FAN_MODE']     = {'0':'-', '49':'QUIET', '50':'1', '51':'2', '5
 function_values['SWING_STATE']  = {'0':'-', '49':'OFF', '65':'ON'}
 function_values['UNIT_MODE']    = {'0':'-', '65':'AUTO', '66':'COOL', '67':'HEAT', '68':'DRY', '69':'FAN'}
 function_values['POWER_SEL']    = {'50':'50%', '75':'75%', '100':'100%'}
-function_values['SPECIAL_MODE'] = {'0':'-', '1':'HIPOWER', '3':'ECO/CFTSLP', '4':'8C', '2':'SILENT-1', '10':'SILENT-2' '32':'FRPL1', '48':'FRPL2'}
+function_values['SPECIAL_MODE'] = {'0':'-', '1':'HIPOWER', '3':'ECO/CFTSLP', '4':'8C', '2':'SILENT-1', '10':'SILENT-2', '32':'FRPL1', '48':'FRPL2'}
 function_values['TIMER_ON']     = {'65':'ON', '66':'OFF'}
 function_values['TIMER_OFF']    = {'65':'ON', '66':'OFF'}
 
@@ -126,7 +126,7 @@ def ac_command(input_function, input_value, num_retries = 4, retry_counter = 0, 
     control_command_prefix = '020003100000070130010002'
     command_result_variable = 'Var3'
     if (not response_only): 
-        if (input_function == 'SPECIAL_MODE' && ('SILENT' in input_value))
+        if (input_function == 'SPECIAL_MODE' and ('SILENT' in input_value)):
             ac_command('POWER_SEL', '100%', num_retries, retry_counter); # set maximum power in silent mode (same as over IR)
         # prepare command
         control_command = control_command_prefix
