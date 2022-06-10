@@ -33,16 +33,16 @@ class Toshiba_HVAC(mqtt.Mqtt):
   
   # HVAC function codes (decimal)
   function_codes = {
-    'TEMP_PRESET': '179', # 17-32 degrees
-    'TEMP_INDOOR': '187',
+    'TEMP_PRESET':  '179', # 17-32 degrees
+    'TEMP_INDOOR':  '187',
     'TEMP_OUTDOOR': '190',
-    'POWER_STATE': '128',
-    'POWER_SEL': '135', # 50/75/100
-    'TIMER_ON': '144',
-    'TIMER_OFF': '148',
-    'FAN_MODE': '160',
-    'SWING_STATE': '163',
-    'UNIT_MODE': '176',
+    'POWER_STATE':  '128',
+    'POWER_SEL':    '135', # 50/75/100
+    'TIMER_ON':     '144',
+    'TIMER_OFF':    '148',
+    'FAN_MODE':     '160',
+    'SWING_STATE':  '163',
+    'UNIT_MODE':    '176',
     'SPECIAL_MODE': '247'
   }
   
