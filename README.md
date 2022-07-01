@@ -10,10 +10,10 @@ I will add instructions, but if someone interested can help me, I will appreciat
 
 ## Hardware
 ![ESP-01](/images/esp01.jpg)
-* ESP-01
+ESP-01
 
 ![ESP-01](/images/esp01_adapter.jpg)
-* ESP-01 Serial Adapter
+ESP-01 Serial Adapter
 
 ![Installation](/images/installation.jpg)
-* Final installation in the unit
+Final installation in the unit
