@@ -8,8 +8,11 @@ Home Assistant integration based on AppDaemon Python/MQTT control script.
 
 I will add instructions, but if someone interested can help me, I will appreciate it. ;-)
 
+![Installation](/images/installation.jpg)  
+Final installation of ESP in the unit  
+
 ![ESP-01](/HomeAssistant/Lovelace_example.png)  
-Example of Home Assistnant's Lovelace component  
+(Example of Home Assistnant's Lovelace component)  
 
 ## Used software components
 <a href="https://tasmota.github.io/" target="_blank">Tasmota Firmware</a>  
@@ -17,11 +20,9 @@ Example of Home Assistnant's Lovelace component
 <a href="https://appdaemon.readthedocs.io/" target="_blank">AppDaemon for Home Assistant</a>  
 
 ## Used hardware components
+### ESP-01
 ![ESP-01](/images/esp01.jpg)  
-ESP-01
 
+### ESP-01 Serial Adapter
 ![ESP-01](/images/esp01_adapter.jpg)  
 ESP-01 Serial Adapter
-
-![Installation](/images/installation.jpg)  
-Final installation of ESP in the unit
