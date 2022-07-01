@@ -9,7 +9,7 @@ Home Assistant integration based on AppDaemon Python/MQTT control script.
 I will add instructions, but if someone interested can help me, I will appreciate it. ;-)
 
 ![Installation](/images/installation.jpg)  
-Final installation of ESP in the unit  
+(Final installation of ESP in the unit)  
 
 ![ESP-01](/HomeAssistant/Lovelace_example.png)  
 (Example of Home Assistnant's Lovelace component)  
