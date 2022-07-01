@@ -9,9 +9,9 @@ Home Assistant integration based on AppDaemon Python/MQTT control script.
 I will add instructions, but if someone interested can help me, I will appreciate it. ;-)
 
 ## Used software components
-[Tasmota Firmware](https://tasmota.github.io/)  
-[Home Assistant](https://www.home-assistant.io/)  
-[AppDaemon for Home Assistant](https://appdaemon.readthedocs.io/)  
+<a href="https://tasmota.github.io/" target="_blank">Tasmota Firmware</a>  
+<a href="https://www.home-assistant.io/" target="_blank">Home Assistant</a>  
+<a href="https://appdaemon.readthedocs.io/" target="_blank">AppDaemon for Home Assistant</a>  
 
 ## Used hardware components
 ![ESP-01](/images/esp01.jpg)  
