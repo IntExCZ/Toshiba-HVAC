@@ -8,6 +8,9 @@ Home Assistant integration based on AppDaemon Python/MQTT control script.
 
 I will add instructions, but if someone interested can help me, I will appreciate it. ;-)
 
+![ESP-01](/HomeAssistant/Lovelace_example.png)  
+Example of Home Assistnant's Lovelace component  
+
 ## Used software components
 <a href="https://tasmota.github.io/" target="_blank">Tasmota Firmware</a>  
 <a href="https://www.home-assistant.io/" target="_blank">Home Assistant</a>  
