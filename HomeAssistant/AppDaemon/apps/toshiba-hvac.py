@@ -8,7 +8,7 @@ import time
 import unicodedata
 
 class Toshiba_HVAC(mqtt.Mqtt):
-  
+
   # runtime variables
   topic_group = "toshiba-hvac"
   topic_prefix = None # toshiba-hvac/pracovna
@@ -378,7 +378,6 @@ class Toshiba_HVAC(mqtt.Mqtt):
   
   # Get all states one by one (app_lock for polling to avoid concurrent runs)
   # returns: [bool] success
-  @ad.app_lock
   def get_all_states(self, kwargs = None):
     self.log_debug(f"get_all_states()")
     if (self.callback_lock):
@@ -409,7 +408,6 @@ class Toshiba_HVAC(mqtt.Mqtt):
   
   # Get only temperature values (app_lock for polling to avoid concurrent runs)
   # returns: [bool] success
-  @ad.app_lock
   def get_temps(self, kwargs = None):
     self.log_debug(f"get_temps()")
     if (self.callback_lock):
@@ -425,10 +423,10 @@ class Toshiba_HVAC(mqtt.Mqtt):
   # returns: [bool] success  
   def set_state(self, state, value):
     self.log_debug(f"set_state('{state}', '{value}')")
+    topic = self.topic_prefix + "/" + state + "/state" # this MQTT topic
     # value correction
     if (state == "UNIT_MODE" and value == "off"):
       # dummy mode for power off (HA triggering POWER_STATE to "OFF" by itself)
-      topic = self.topic_prefix + "/" + state + "/state"
       self.mqtt_publish(topic, value, qos=1, namespace="mqtt")
       self.log_debug("Power off, no action")
       return False
@@ -440,7 +438,10 @@ class Toshiba_HVAC(mqtt.Mqtt):
     if (not self.hvac_command(state, value)):
       self.log_set("ERROR")
       return False
-    # update MQTT
+    # UPDATE MQTT
+    # reflect SET state
+    self.mqtt_publish(topic, value, qos=1, namespace="mqtt")
+    # update to ACTUAL state
     result = self.get_state(state)
     if (result != value):
       self.log_set(f"Unconfirmed ({state}: {value} = {result})")
@@ -706,6 +707,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
     self.room_name = self.args['room_name']
     self.full_polling_sec = self.args['full_polling_sec']
     self.temps_polling_sec = self.args['temps_polling_sec']
+    self.scheduler_pin_thread = self.args['scheduler_pin_thread']
     self.topic_prefix = self.normalize_string(f"{self.topic_group}/{self.room_name}")
     # init
     self.log_main(f"Room: {self.remove_accents(self.room_name)}") # unaccent for log
@@ -718,13 +720,13 @@ class Toshiba_HVAC(mqtt.Mqtt):
       self.log_main("States reading done")
     else:
       self.log_main("ERROR: States reading failed")
-    # state polling
+    # state polling (own separated thread)
     if (self.full_polling_sec):
       self.log_debug(f"Full polling seconds: {self.full_polling_sec}")
-      self.run_every(self.get_all_states, "now + 10", self.full_polling_sec) # poll 10 seconds after init
+      self.run_every(self.get_all_states, "now + 10", self.full_polling_sec, pin=True, pin_thread=self.scheduler_pin_thread) # poll 10 seconds after init
     if (self.temps_polling_sec):
       self.log_debug(f"Temps polling seconds: {self.temps_polling_sec}")
-      self.run_every(self.get_temps, "now + 20", self.temps_polling_sec) # poll 20 seconds after init
+      self.run_every(self.get_temps, "now + 20", self.temps_polling_sec, pin=True, pin_thread=self.scheduler_pin_thread) # poll 20 seconds after init
     if (self.full_polling_sec or self.temps_polling_sec):
       self.log_main("State polling set")
     self.log_main("= INIT COMPLETED =")
