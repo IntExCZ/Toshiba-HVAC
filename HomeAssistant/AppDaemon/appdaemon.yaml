@@ -5,8 +5,7 @@ appdaemon:
   longitude: 2
   elevation: 3
   time_zone: Europe/Amsterdam
-  pin_threads: 0
-  load_distribution: random
+  total_threads: 8 # 4 apps X 2 threads (main + scheduler)
   thread_duration_warning_threshold: 20
   plugins:
     HASS:
