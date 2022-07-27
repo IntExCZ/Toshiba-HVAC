@@ -381,7 +381,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
   def get_all_states(self, kwargs = None):
     self.log_debug(f"get_all_states()")
     if (self.callback_lock):
-      self.log_main("Callback lock is set, skipping run")
+      self.log_main("Callback lock is set, skipping get_all_states() run")
       return False # avoid callback conflicts
     self.callback_lock = True
     power_state = self.get_state('POWER_STATE')
@@ -411,7 +411,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
   def get_temps(self, kwargs = None):
     self.log_debug(f"get_temps()")
     if (self.callback_lock):
-      self.log_main("Callback lock is set, skipping run")
+      self.log_main("Callback lock is set, skipping get_temps() run")
       return False # avoid callback conflicts
     self.callback_lock = True
     self.get_state('TEMP_INDOOR')
