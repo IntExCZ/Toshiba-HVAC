@@ -25,3 +25,9 @@ I will add instructions, but if someone interested can help me, I will appreciat
 
 ### ESP-01 Serial Adapter
 ![ESP-01](/images/esp01_adapter.jpg)  
+
+## Pinout
+AC BLUE = TO ESP TX
+AC PINK = GND
+AC BLACK = +5V VCC
+AC WHITE = TO ESP RX
