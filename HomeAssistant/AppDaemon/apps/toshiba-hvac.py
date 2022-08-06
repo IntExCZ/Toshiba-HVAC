@@ -29,7 +29,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
   temps_polling_sec = None
 
   # States for HA
-  states = {'POWER_STATE', 'UNIT_MODE', 'POWER_SEL', 'SPECIAL_MODE', 'FAN_MODE', 'SWING_STATE', 'TEMP_PRESET', 'TEMP_INDOOR', 'TEMP_OUTDOOR'}
+  states = {'POWER_STATE', 'UNIT_MODE', 'POWER_SEL', 'SPECIAL_MODE', 'FAN_MODE', 'SWING_STATE', 'TEMP_PRESET', 'TEMP_INDOOR', 'TEMP_OUTDOOR', 'TIMER_ON', 'TIMER_OFF'}
   
   # HVAC function codes (decimal)
   function_codes = {
@@ -249,6 +249,38 @@ class Toshiba_HVAC(mqtt.Mqtt):
       }
     }
     self.discovery_create_control('sensor', object_id, config)
+    # TIMER_ON sensor
+    object_id = unique_name + "_timer_on"
+    config = {
+      "object_id": object_id,
+      "unique_id": object_id,
+      "name": f"{self.room_name} HVAC Start Timer",
+      "icon": "mdi:timer-play-outline",
+      "state_topic": f"{self.topic_prefix}/TIMER_ON",
+      "payload_on": "ON",
+      "payload_off": "OFF",
+      "device_class": "running",
+      "device": {
+        "identifiers": unique_name
+      }
+    }
+    self.discovery_create_control('binary_sensor', object_id, config)
+    # TIMER_OFF sensor
+    object_id = unique_name + "_timer_off"
+    config = {
+      "object_id": object_id,
+      "unique_id": object_id,
+      "name": f"{self.room_name} HVAC Stop Timer",
+      "icon": "mdi:timer-stop-outline",
+      "state_topic": f"{self.topic_prefix}/TIMER_OFF",
+      "payload_on": "ON",
+      "payload_off": "OFF",
+      "device_class": "running",
+      "device": {
+        "identifiers": unique_name
+      }
+    }
+    self.discovery_create_control('binary_sensor', object_id, config)
     # Last_refresh sensor
     object_id = unique_name + "_last_refresh"
     config = {
@@ -315,9 +347,9 @@ class Toshiba_HVAC(mqtt.Mqtt):
     self.listen_event(self.refresh_request, "MQTT_MESSAGE", topic=topic, namespace="mqtt")
     # state listeners
     for state in self.states:
-      # do not register temperature settings
-      if (state == "TEMP_INDOOR" or state == "TEMP_OUTDOOR"):
-        continue # indoor/outdoor temp cannot be set
+      # do not register temperature/timer settings
+      if (state == "TEMP_INDOOR" or state == "TEMP_OUTDOOR" or "TIMER_" in state):
+        continue # indoor/outdoor temp and timer cannot be set
       else:
         topic = self.topic_prefix + "/" + state + "/set" # set for "MQTT Climate"
       self.mqtt_subscribe(topic, namespace="mqtt")
@@ -367,7 +399,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
     if (state == "UNIT_MODE" or state == "SWING_STATE"):
       result = result.lower()
     # publish to MQTT
-    if (state == "TEMP_INDOOR" or state == "TEMP_OUTDOOR"):
+    if (state == "TEMP_INDOOR" or state == "TEMP_OUTDOOR" or 'TIMER_' in state):
       topic = self.topic_prefix + "/" + state # read-only values
     else:  
       topic = self.topic_prefix + "/" + state + "/state"
