@@ -34,6 +34,7 @@ I will add instructions, but if someone interested can help me, I will appreciat
 
 ## Tasmota configuration
 Flash Tasmota to ESP, set password and WiFi network parameters.    
+  
 In console input these commands:  
 `SerialConfig 8E1`  
 `Baudrate 9600`  
@@ -43,6 +44,6 @@ In console input these commands:
 `Rule2 1`  
 `Rule3 ON Wifi#Connected DO Backlog SerialConfig 8O1; SerialConfig 8E1; Delay 10; SerialSend5 02FFFF0000000002; SerialSend5 02FFFF0100000102FE; SerialSend5 020000000000020202FA; SerialSend5 0200018101000200007B; SerialSend5 020001020000020000FB; SerialSend5 02000200000000FE; Delay 20; SerialSend5 020002010000020000FB; SerialSend5 020002020000020000FA ENDON`  
 `Rule3 1`  
-(serial configuration, keep-alive timer, HVAC response extraction, WiFi reconnection handshake)    
+(It is the serial configuration, keep-alive timer, HVAC response extraction and WiFi reconnection handshake.)    
   
 Nothing else needs to be set.
