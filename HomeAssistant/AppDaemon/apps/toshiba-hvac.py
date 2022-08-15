@@ -45,7 +45,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
     'UNIT_MODE':    '176',
     'SPECIAL_MODE': '247'
   }
-  
+
   # HVAC function possible values
   function_values = {
     'POWER_STATE':  {'0':'-', '48':'ON', '49':'OFF'},
@@ -380,7 +380,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
       self.log_debug("Empty value, no action")
       return
     self.set_state(state, value)
- 
+
   # Get state from HVAC and publish to MQTT  
   # returns: [str] state result
   def get_state(self, state):
@@ -407,7 +407,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
     self.log_hvac(f"Query success ({state}: {result})")
     self.log_debug(f"{state}: {result}")
     return result
-  
+
   # Get all states one by one (app_lock for polling to avoid concurrent runs)
   # returns: [bool] success
   def get_all_states(self, kwargs = None):
@@ -437,8 +437,8 @@ class Toshiba_HVAC(mqtt.Mqtt):
     self.mqtt_publish(topic, value, qos=1, namespace="mqtt")
     self.callback_lock = False
     return True #
-  
-  # Get only temperature values (app_lock for polling to avoid concurrent runs)
+
+  # Get temperature values (app_lock for polling to avoid concurrent runs)
   # returns: [bool] success
   def get_temps(self, kwargs = None):
     self.log_debug(f"get_temps()")
@@ -451,7 +451,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
     self.callback_lock = False
     return True
 
-  # Get only timer states (app_lock for polling to avoid concurrent runs)
+  # Get timer states
   # returns: [bool] any timer is ON
   def get_timers(self, kwargs = None):
     self.log_debug(f"get_timers()")
@@ -461,7 +461,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
     if (self.get_state('TIMER_ON') == 'ON'):
       return True
     return False
-   
+
   # Set value to state and get actual (new) state from HVAC
   # returns: [bool] success  
   def set_state(self, state, value):
@@ -601,7 +601,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
     if (len(checksum) < 2):
       checksum = '0' + checksum # missing leading zero
     return checksum
-  
+
   # Get value from HVAC
   # returns: [bool] error (False), [int] temperature, [str] function value
   def hvac_query(self, input_function, num_retries = 4, retry_counter = 0, response_only = False):
@@ -699,7 +699,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
       return self.hvac_command(input_function, original_input_value, num_retries, retry_counter, retry_counter%2 == 1) # even retry = retry whole command, odd retry = re-read response
     self.log_hvac("Command success")
     return True
-    
+
 
 # === LOGGING ===
 
