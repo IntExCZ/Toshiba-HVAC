@@ -451,6 +451,17 @@ class Toshiba_HVAC(mqtt.Mqtt):
     self.callback_lock = False
     return True
 
+  # Get only timer states (app_lock for polling to avoid concurrent runs)
+  # returns: [bool] any timer is ON
+  def get_timers(self, kwargs = None):
+    self.log_debug(f"get_timers()")
+    # off timer is more common
+    if (self.get_state('TIMER_OFF') == 'ON'):
+      return True
+    if (self.get_state('TIMER_ON') == 'ON'):
+      return True
+    return False
+   
   # Set value to state and get actual (new) state from HVAC
   # returns: [bool] success  
   def set_state(self, state, value):
@@ -475,8 +486,16 @@ class Toshiba_HVAC(mqtt.Mqtt):
     self.mqtt_publish(topic, value, qos=1, namespace="mqtt")
     # update to ACTUAL state
     result = self.get_state(state)
+    # check power state timers
+    active_timer = False
+    if (state == "POWER_STATE"):
+      if (self.get_timers()):
+          active_timer = True
+          self.log_set("Power state affected by active timer")
+    # evaluate set result
     if (result != value):
-      self.log_set(f"Unconfirmed ({state}: {value} = {result})")
+      if (not active_timer):
+        self.log_set(f"Unconfirmed ({state}: {value} = {result})")
       return False
     self.log_set(f"Confirmed ({state}: {value})")
     # adapt UNIT_MODE state to POWER_STATE
