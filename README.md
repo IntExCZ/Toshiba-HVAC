@@ -46,4 +46,4 @@ In console input these commands:
 `Rule3 1`  
 (It is the serial configuration, keep-alive timer, HVAC response extraction and WiFi reconnection handshake.)    
   
-Nothing else to be set.
+Nothing else need to be set.
