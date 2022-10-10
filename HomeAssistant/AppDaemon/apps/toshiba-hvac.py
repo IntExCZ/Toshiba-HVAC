@@ -170,7 +170,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
       "object_id": object_id,
       "unique_id": object_id,
       "name": f"{self.room_name} HVAC Special Mode",
-      "icon": "mdi:fan-plus",
+      "icon": "mdi:alpha-s-circle",
       "availability_topic": f"{self.topic_prefix}/connection_state",
       "command_topic": f"{self.topic_prefix}/SPECIAL_MODE/set",
       "state_topic": f"{self.topic_prefix}/SPECIAL_MODE/state",
