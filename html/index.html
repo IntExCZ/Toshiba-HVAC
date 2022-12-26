@@ -21,10 +21,10 @@
 			.state_value {font-weight:bold;}
 			select,input,option {color:black}
 			select {width:193px}
-			#TEMP_PRESET_input {width:80px;margin-right:15px;text-align:center;}
-			#TEMP_PRESET_plus_button {display:none;}
-			#TEMP_PRESET_minus_button {display:none;}
-			#TEMP_PRESET_set_button {display:inline}
+			#TEMP_SETPOINT_input {width:80px;margin-right:15px;text-align:center;}
+			#TEMP_SETPOINT_plus_button {display:none;}
+			#TEMP_SETPOINT_minus_button {display:none;}
+			#TEMP_SETPOINT_set_button {display:inline}
 			input[type="button"] {padding-left:10px;padding-right:10px}
 			#get_all_button {text-align:center;padding-top:15px !important;font-size:0.9em;}
 			#get_all_button input {font-weight:normal;text-transform:uppercase}
@@ -49,12 +49,12 @@
 			  #main_table .state_set {padding-left:0vw;padding-right:2vw}
 			  #hvac_selection {padding-bottom:2vw !important}
 			  #hvac_selection #hvac {width:auto}
-			  #TEMP_PRESET_input {width:6vw;margin:0vw}
-			  #TEMP_PRESET_input::-webkit-outer-spin-button,
-			  #TEMP_PRESET_input::-webkit-inner-spin-button {-webkit-appearance:none;margin:0vw}
-			  #TEMP_PRESET_minus_button {display:inline;width:4vw;padding:0px}
-			  #TEMP_PRESET_plus_button {display:inline;width:4vw;padding:0px}
-			  #TEMP_PRESET_set_button {width:10vw;padding:0px;margin-left:1vw}
+			  #TEMP_SETPOINT_input {width:6vw;margin:0vw}
+			  #TEMP_SETPOINT_input::-webkit-outer-spin-button,
+			  #TEMP_SETPOINT_input::-webkit-inner-spin-button {-webkit-appearance:none;margin:0vw}
+			  #TEMP_SETPOINT_minus_button {display:inline;width:4vw;padding:0px}
+			  #TEMP_SETPOINT_plus_button {display:inline;width:4vw;padding:0px}
+			  #TEMP_SETPOINT_set_button {width:10vw;padding:0px;margin-left:1vw}
 			  #get_all_button {text-align:center;padding-top:2vw !important}
 			  select {width:25vw}
 			  .loader {width:2vw;height:2vw;border-width:1.5vw}
@@ -99,8 +99,8 @@
 				$.each(data, function(key, val) {
 					console.log(key + ": " + val);
 					$('#' + key).html(val); // show value in appropriate field
-					if (key == "TEMP_PRESET")
-						$('#TEMP_PRESET_input').val(val); // adapt setting field
+					if (key == "TEMP_SETPOINT")
+						$('#TEMP_SETPOINT_input').val(val); // adapt setting field
 				});
 				$('.state_set select').val("-"); // reset select boxes
 				disable_controls(false);
@@ -254,9 +254,10 @@
 					<tr>
 						<td colspan="3" id="hvac_selection">
 							<select id="hvac" onchange="select_hvac($(this).val())">
-								<option value="host=192.168.1.101&username=admin&password=12345">Unit_1</option>
-								<option value="host=192.168.1.102&username=admin&password=12345">Unit_2</option>
-								<option value="host=192.168.1.103&username=admin&password=12345">Unit_3</option>
+								<option value="host=192.168.1.101&username=admin&password=12345">Pracovna</option>
+								<option value="host=192.168.1.102&username=admin&password=12345">Obyvak</option>
+								<option value="host=192.168.1.103&username=admin&password=12345">Loznice</option>
+								<option value="host=192.168.1.104&username=admin&password=12345">Velky_pokoj</option>
 							</select>
 						</td>
 					</tr>
@@ -266,9 +267,11 @@
 					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">Special mode:</td><td class="state_value" id="SPECIAL_MODE" onclick="get_state($(this).attr('id'))"></td><td class="state_set"><select id="SPECIAL_MODE_select" state="SPECIAL_MODE" onchange="set_state($(this).attr('state'), $(this).val())" onfocus="this.selectedIndex = -1;"></select></td></tr>
 					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">FAN mode:</td><td class="state_value" id="FAN_MODE" onclick="get_state($(this).attr('id'))"></td><td class="state_set"><select id="FAN_MODE_select" state="FAN_MODE" onchange="set_state($(this).attr('state'), $(this).val())"></select></td></tr>
 					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">Swing state:</td><td class="state_value" id="SWING_STATE" onclick="get_state($(this).attr('id'))"></td><td class="state_set"><select id="SWING_STATE_select" state="SWING_STATE" onchange="set_state($(this).attr('state'), $(this).val())"></select></td></tr>
-					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">Preset temp:</td><td class="state_value" id="TEMP_PRESET" onclick="get_state($(this).attr('id'))"></td><td class="state_set">
-							<input type="button" id="TEMP_PRESET_minus_button" value="-" onclick="$('#TEMP_PRESET_input').val(parseInt($('#TEMP_PRESET_input').val())-1)"><input type="number" min="17" max="32" value="22" id="TEMP_PRESET_input"><input type="button" id="TEMP_PRESET_plus_button" value="+" onclick="$('#TEMP_PRESET_input').val(parseInt($('#TEMP_PRESET_input').val())+1)"><input type="button" value="SET" id="TEMP_PRESET_set_button" onclick="set_state('TEMP_PRESET', $('#TEMP_PRESET_input').val())">				
-					</td></tr>
+					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">Setpoint temp:</td><td class="state_value" id="TEMP_SETPOINT" onclick="get_state($(this).attr('id'))"></td>
+						<td class="state_set">
+							<input type="button" id="TEMP_SETPOINT_minus_button" value="-" onclick="$('#TEMP_SETPOINT_input').val(parseInt($('#TEMP_SETPOINT_input').val())-1)"><input type="number" min="17" max="32" value="22" id="TEMP_SETPOINT_input"><input type="button" id="TEMP_SETPOINT_plus_button" value="+" onclick="$('#TEMP_SETPOINT_input').val(parseInt($('#TEMP_SETPOINT_input').val())+1)"><input type="button" value="SET" id="TEMP_SETPOINT_set_button" onclick="set_state('TEMP_SETPOINT', $('#TEMP_SETPOINT_input').val())">				
+						</td>
+					</tr>
 					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">Indoor temp:</td><td class="state_value" id="TEMP_INDOOR" onclick="get_state($(this).attr('id'))"></td><td class="state_set"></td></tr>
 					<tr class="state"><td class="state_name" onclick="$(this).next('td').click()">Outdoor temp:</td><td class="state_value" id="TEMP_OUTDOOR" onclick="get_state($(this).attr('id'))"></td><td class="state_set"></td></tr>
 					<tr><td id="get_all_button" colspan="3"><input type="button" id="btn_get_all_states" value="Get all states" onclick="get_all_states()" /></td></tr>
