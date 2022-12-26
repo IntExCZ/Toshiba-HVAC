@@ -1,0 +1,590 @@
+<!DOCTYPE html>
+<html lang="en" class="">
+    <head>
+        <meta charset='utf-8'>
+        <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no"/>
+        <title>Pracovna-HVAC - Console</title>
+        <script src="jquery.min.js"></script>
+        <script>var debug_proxy = 'https://toshiba.smartnode.cz/debug-proxy.php/';</script>
+        <script>
+            var x = null,
+                lt, to, tp, pc = '';
+
+            var sn = 0,
+                id = 0,
+                ft, ltm = 2345;
+    
+            function console_updater(p) {
+                var c, o = '';
+                clearTimeout(lt);
+                clearTimeout(ft);
+                console_text = document.getElementById('console_text');
+                if (p == 1) {
+                    c = document.getElementById('master_command');
+                    o = '&c1=' + encodeURIComponent(c.value);
+                    c.value = '';
+                    console_text.scrollTop = 99999;
+                    sn = console_text.scrollTop;
+                }
+                if (console_text.scrollTop >= sn) {
+                    if (x != null) {
+                        x.abort();
+                    }
+                    x = new XMLHttpRequest();
+                    x.onreadystatechange = function() {
+                        if (x.readyState == 4 && x.status == 200) {
+                            var z, d;
+                            d = x.responseText.split(/}1/);
+                            id = d.shift();
+                            if (d.shift() == 0) {
+                                console_text.value = '';
+                            }
+                            z = d.shift();
+                            if (z.length > 0) {
+                                console_text.value += filter_log(z);
+                            }
+                            console_text.scrollTop = 99999;
+                            sn = console_text.scrollTop;
+                            clearTimeout(ft);
+                            lt = setTimeout(console_updater, ltm);
+                        }
+                    };
+                    x.open('GET', debug_proxy + 'cs?c2=' + id + o, true);
+                    x.send();
+                    ft = setTimeout(console_updater, 20000);
+                } else {
+                    lt = setTimeout(console_updater, ltm);
+                }
+                return false;
+            }
+            window.addEventListener('load', console_updater);
+              
+            var hc = [],
+                cn = 0;
+              
+            function console_key_listener() {
+                document.getElementById('master_command').addEventListener('keydown', function(e) {
+                    var b = document.getElementById('master_command'),
+                        c = e.keyCode;
+                    if (38 == c || 40 == c) {
+                        b.autocomplete = 'off';
+                    }
+                    38 == c ? (++cn > hc.length && (cn = hc.length), b.value = hc[cn - 1] || '') : 40 == c ? (0 > --cn && (cn = 0), b.value = hc[cn - 1] || '') : 13 == c && (hc.length > 19 && hc.pop(), hc.unshift(b.value), cn = 0)
+                });
+            }
+            window.addEventListener('load', console_key_listener);
+        </script>
+        <style>
+          div, fieldset, input, select{padding:5px; font-size:1em;}
+          fieldset{background:#4f4f4f;}
+          p{margin:0.5em 0;}
+          input{width:100%; box-sizing:border-box; -webkit-box-sizing:border-box; -moz-box-sizing:border-box; background:#dddddd; color:#000000;}
+          input[type=checkbox], input[type=radio]{width:1em; margin-right:6px; vertical-align:-1px;}
+          input[type=range]{width:99%;}
+          select{width:100%; background:#dddddd; color:#000000;}
+          textarea{resize:vertical; width:99%; height:318px; padding:5px; overflow:auto; background:#1f1f1f; color:#65c115;}
+          body{text-align:center; font-family:verdana, sans-serif; background:#252525;}
+          td{padding:0px;}
+          button{border:0; border-radius:0.3rem; background:#1fa3ec; color:#faffff; line-height:2.4rem; font-size:1.2rem; width:100%; -webkit-transition-duration:0.4s; transition-duration:0.4s; cursor:pointer;}
+          button:hover{background:#0e70a4;}
+          .bred{background:#d43535;}
+          .bred:hover{background:#931f1f;}
+          .bgrn{background:#47c266;}
+          .bgrn:hover{background:#5aaf6f;}
+          a{color:#1fa3ec; text-decoration:none;}
+          .p{float:left; text-align:left;}
+          .q{float:right; text-align:right;}
+          .r{border-radius:0.3em; padding:2px; margin:6px 2px;}
+          .hf{display:none;}
+          #main_div{text-align:left;display:inline-block;color:#eaeaea;min-width:340px;}
+          #header{text-align:center;color:#eaeaea;}
+          #caption{margin:10px}
+          #hints{text-align:center;display:none;}
+          #commands{text-align:center;width:900px;margin:auto;padding:0px}
+          .cmd_prefix{width:250px;margin-left:10px;border:2px solid blue}
+          .cmd_code{width:65px;border:2px solid cyan}
+          .cmd_value{width:80px;border:2px solid red}
+          .cmd_checksum{width:35px;border:2px solid green;color:green}
+          .cmd_note{border:2px solid yellow;margin-top:10px}
+          .checksum{display:none}
+          .cmd_clear, .cmd_load, .cmd_save, .cmd_send{width:80px;margin-left:10px}
+          .cmd_clear, .cmd_load, .cmd_save{width:30px}
+          .cmd_load, .cmd_save{margin-left:0px}
+          .cmd_send{font-weight:bold}
+          #commands input{text-align:center}
+          #clear_console{width:200px;font-weight:bold}
+          #calc table{width:150px;margin:auto}
+          #calc input{text-align:center}
+          #master_command{width:94%;font-weight:bold}
+          #master_send{width:5%;font-weight:bold}
+        </style>
+        <script>
+            // in HEX
+            var function_codes = [];
+            function_codes['TEMP_SETPOINT']    = 'B3'; // 17-32 degrees
+            function_codes['TEMP_INDOOR']    = 'BB';
+            function_codes['TEMP_OUTDOOR']   = 'BE';
+            function_codes['POWER_STATE']    = '80';
+            function_codes['POWER_SEL']      = '87'; // 50/75/100
+            function_codes['TIMER_ON']       = '90';
+            function_codes['TIMER_OFF']      = '94';
+            function_codes['CFTSLP_TIME']    = '96';
+            function_codes['FAN_MODE']       = 'A0';
+            function_codes['SWING_STATE']    = 'A3';
+            function_codes['UNIT_MODE']      = 'B0';
+            function_codes['TEMP_EXCHANGER'] = 'CB'; // asi urcite (v manualu TC/TCJ sensor)... spadlo to o dost nize po zapnuti (16 oproti indooru 24, outdoor 17)
+            function_codes['SPECIAL_MODE']   = 'F7';
+            
+            // in HEX
+            var function_values = [];
+            function_values['POWER_STATE']  = {'00': '-', '30': 'ON', '31': 'OFF'};
+            function_values['FAN_MODE']     = {'00': '-', '31': 'QUIET', '32': '1', '33': '2', '34': '3', '35': '4', '36': '5', '41': 'AUTO'};
+            function_values['SWING_STATE']  = {'00': '-', '31': 'OFF', '41': 'ON'};
+            function_values['UNIT_MODE']    = {'00': '-', '41': 'AUTO', '42': 'COOL', '43': 'HEAT', '44': 'DRY', '45': 'FAN'};
+            function_values['POWER_SEL']    = {'32': '50%', '48': '75%', '64': '100%'};
+            function_values['CFTSLP_TIME']  = {'01': '1H', '03': '3H', '05': '5H', '09': '9H'};
+            function_values['SPECIAL_MODE'] = {'00': '-', '01': 'HIPOWER', '03': 'ECO/CTSP', '04': '8C', '02': 'SILENT-1', '0A': 'SILENT-2', '20': 'FRPL1', '30': 'FRPL2'}; // CTSP = Comfort Sleep
+            function_values['TIMER_ON']     = {'41': 'ON', '42': 'OFF'};
+            function_values['TIMER_OFF']    = {'41': 'ON', '42': 'OFF'};
+        </script>
+        <script>
+            var tasmota_real_url = 'http://192.168.1.101/';
+            var translate_commands = false;
+            
+            function to_hex(input) {
+                var result = parseInt(input); // convert to number
+                result = result.toString(16).toUpperCase(); // convert to hex
+                if (result.length < 2)
+                    result = '0' + result; // add leading zero
+                return result;
+            }
+            
+            function to_dec(input) {
+                return parseInt(input, 16);
+            }
+            
+            function extract_vals(str, prefix, recursion = false) {
+                var prefix_indexes = [...str.matchAll(new RegExp(prefix, 'gi'))].map(a => a.index); // indexy vsech vyskytu
+                var results = [];
+                for (var index in prefix_indexes) {
+                    var prefix_index = prefix_indexes[index];
+                    var prefix_length = prefix.length; // delka klice plus ":"
+                    var pos = prefix_index + prefix_length;  // zacatek hodnoty
+                    var result = str.substring(pos, pos + 2); // dvouznakova hodnota
+                    var is_checksum = (str.substring(pos + 2, pos + 4).includes("\n")); // zde by mel byt checksum (konec radku)
+                    if (is_checksum)
+                        continue; // preskocit checksum
+                    results.push(result); // dvouznakova hodnota
+                }
+                return results;
+            }
+            
+            function create_functions_datalist() {
+                var datalist = $('<datalist id="cmd_code"></datalist>');
+                for (var key in function_codes) {
+                    datalist.append('<option value="' + function_codes[key] + '">' + key + '</option>');
+                }
+                return datalist;
+            }
+
+            function create_values_datalist() {
+                var datalist = $('<datalist id="cmd_value"></datalist>');
+                for (var function_key in function_values) {
+                    for (var value_key in function_values[function_key]) {
+                        datalist.append('<option value="' + value_key + '">' + function_values[function_key][value_key] + ' (' + function_key + ')</option>');
+                    }
+                }
+                return datalist;
+            }
+            
+            function calc_checksum(input) {
+                var input_array = input.match(/.{1,2}/g); // split to array of two digits
+                input_array.shift(); // remove start byte (02)  
+                input_array = input_array.map(function (x) { return parseInt(x, 16); }); // hex to dec all vals
+                var checksum = input_array.reduce(function(a1, a2) { return a1+a2; }, 0); // calculate sum of vals
+                checksum = (256-(checksum)%256)%256; // calculate checksum
+                return to_hex(checksum); // hex converted checksum
+            }
+            
+            function convert_temp(input) {
+                if (input == 127)
+                    return '-'; // invalid value
+                if (input > 127)
+                    return input - 256; // negative value
+                return input; // positive value
+            }
+            
+            function create_url(input_cmd) {
+                var base = tasmota_real_url + 'cm?user=admin&password=12345&cmnd=';
+                var url = base + input_cmd;
+                return url; 
+            }
+            
+            function cmd_onchange(parent_obj) {
+                // inputs
+                var cmd_prefix = parent_obj.find('.cmd_prefix');
+                var cmd_code = parent_obj.find('.cmd_code');
+                var cmd_value = parent_obj.find('.cmd_value');
+                var cmd_checksum = parent_obj.find('.cmd_checksum');
+                var cmd_url = parent_obj.find('.cmd_url');
+                var cmd_text = parent_obj.find('.cmd_text');
+                // values (remove whitespaces)
+                var prefix = cmd_prefix.val().replace(/\s/g,'');
+                var code = cmd_code.val().replace(/\s/g,'');
+                var value = cmd_value.val().replace(/\s/g,'');
+                // value checks
+                if (!prefix)
+                    return;
+                if (!code)
+                    return;
+                // command selection logic
+                if (prefix == '020003100000060130010001')
+                    value = ""; // clear value on query
+                // value inputs update
+                cmd_prefix.val(prefix);
+                cmd_code.val(code);
+                cmd_value.val(value);
+                // checksum
+                var command = prefix + code + value;
+                var checksum = calc_checksum(command);
+                cmd_checksum.val(checksum);
+                // command text
+                var text = 'SerialSend5 ' + command + checksum;
+                cmd_text.val(text);
+                // url
+                var url = create_url(text);
+                cmd_url.val(url);   
+            }
+            
+            function filter_log(text) {
+                var filtered_text = text;   
+                console.log(text);  
+                filtered_text = filtered_text.replace(/^.*Var.*$/mg, '[Var]'); // variable setting
+                filtered_text = filtered_text.replace(/^.*STATE.*$/mg, '[Tasmota-state]'); // Tasmota state info
+                if (translate_commands) {
+                    // prefixes
+                    filtered_text = filtered_text.replace(/02000311..000701300100/g, 'self_resp:'); // HVAC keep-alive self response
+                    filtered_text = filtered_text.replace(/0200031000000601300100/g, "qry:");
+                    filtered_text = filtered_text.replace(/0200031000000701300100/g, "cmd:");
+                    filtered_text = filtered_text.replace(/02000390000009013001000000/g, "qry_resp:");
+                    filtered_text = filtered_text.replace(/02000390000008013001000000/g, "cmd_resp:");
+                    // command codes
+                    for (var key in function_codes) {
+                        // queries
+                        var filter = "01" + function_codes[key];
+                        var re = new RegExp(filter, "g");
+                        filtered_text = filtered_text.replace(re, "_" + key + ":");
+                        // responses
+                        var filter = "02" + function_codes[key];
+                        var re = new RegExp(filter, "g");
+                        filtered_text = filtered_text.replace(re, "_" + key + ":");
+                        // special responses (CFTSLP_TIME)
+                        var filter = "03" + function_codes[key];
+                        var re = new RegExp(filter, "g");
+                        filtered_text = filtered_text.replace(re, "_" + key + ":");
+                    }
+                    // command values
+                    for (var function_key in function_values) {
+                        //console.log(function_key);
+                        var func_prefix = function_key + ":";
+                        if (filtered_text.includes(func_prefix)) {
+                            // string obsahuje nazev funkce
+                            //var value = extract_vals(filtered_text, func_prefix);
+                            var values = extract_vals(filtered_text, func_prefix);
+                            for (var value in values) {
+                                value = values[value];  
+                                var obj = function_values[function_key];
+                                if (Object.keys(obj).includes(value)) {
+                                    // hodnota ve stringu odpovida funkcni hodnote
+                                    var value_res = obj[value];
+                                    var filter = func_prefix + value;
+                                    var re = new RegExp(filter, "g");
+                                    filtered_text = filtered_text.replace(re, func_prefix + value_res + "_");
+                                }
+                            }
+                        }
+                    }
+                    // temperature values
+                    var func_prefix = "TEMP_INDOOR" + ":";
+                    if (filtered_text.includes(func_prefix)) {
+                        var values = extract_vals(filtered_text, func_prefix);
+                        for (var value in values) {
+                            value = values[value];
+                            var value_res = convert_temp(to_dec(value));
+                            var filter = func_prefix + value;
+                            var re = new RegExp(filter, "g");
+                            filtered_text = filtered_text.replace(re, func_prefix + value_res + "°C_");
+                        }
+                    }
+                    var func_prefix = "TEMP_OUTDOOR" + ":";
+                    if (filtered_text.includes(func_prefix)) {
+                        var values = extract_vals(filtered_text, func_prefix);
+                        for (var value in values) {
+                            value = values[value];
+                            var value_res = convert_temp(to_dec(value));
+                            var filter = func_prefix + value;
+                            var re = new RegExp(filter, "g");
+                            filtered_text = filtered_text.replace(re, func_prefix + value_res + "°C_");
+                        }
+                    }
+                    var func_prefix = "TEMP_SETPOINT" + ":";
+                    if (filtered_text.includes(func_prefix)) {
+                        var values = extract_vals(filtered_text, func_prefix);
+                        for (var value in values) {
+                            value = values[value];
+                            var value_res = convert_temp(to_dec(value));
+                            var filter = func_prefix + value;
+                            var re = new RegExp(filter, "g");
+                            filtered_text = filtered_text.replace(re, func_prefix + value_res + "°C_");
+                        }
+                    }
+                    var func_prefix = "TEMP_EXCHANGER" + ":";
+                    if (filtered_text.includes(func_prefix)) {
+                        var values = extract_vals(filtered_text, func_prefix);
+                        for (var value in values) {
+                            value = values[value];
+                            var value_res = convert_temp(to_dec(value));
+                            var filter = func_prefix + value;
+                            var re = new RegExp(filter, "g");
+                            filtered_text = filtered_text.replace(re, func_prefix + value_res + "°C_");
+                        }
+                    }
+                }
+                return filtered_text;
+            }
+            
+            function clear_console() {
+                $('#console_text').val('');
+                sn = 0;
+                console_updater();
+            }
+            
+            function cmd_clear(parent_obj) {
+                // inputs
+                var cmd_prefix = parent_obj.find('.cmd_prefix');
+                var cmd_code = parent_obj.find('.cmd_code');
+                var cmd_value = parent_obj.find('.cmd_value');
+                var cmd_note = parent_obj.find('.cmd_note');
+                var cmd_text = parent_obj.find('.cmd_text');
+                // values
+                cmd_prefix.val('');
+                cmd_code.val('');
+                cmd_value.val('');
+                cmd_note.val('');
+                cmd_text.val('');
+            }
+            
+            function cmd_load(parent_obj) {
+                // inputs
+                var cmd_prefix = parent_obj.find('.cmd_prefix');
+                var cmd_code = parent_obj.find('.cmd_code');
+                var cmd_value = parent_obj.find('.cmd_value');
+                var cmd_note = parent_obj.find('.cmd_note');
+                // restoring
+                var order = parent_obj.attr("order");
+                order = prompt("Load values from command:", order);
+                cmd_prefix.val(getCookie('cmd_prefix_' + order)).change();
+                cmd_code.val(getCookie('cmd_code_' + order)).change();
+                cmd_value.val(getCookie('cmd_value_' + order)).change();
+                cmd_note.val(getCookie('cmd_note_' + order)).change();
+            }
+            
+            function cmd_save(parent_obj) {
+                // inputs
+                var cmd_prefix = parent_obj.find('.cmd_prefix');
+                var cmd_code = parent_obj.find('.cmd_code');
+                var cmd_value = parent_obj.find('.cmd_value');
+                var cmd_note = parent_obj.find('.cmd_note');
+                // values
+                prefix = cmd_prefix.val();
+                code = cmd_code.val();
+                value = cmd_value.val();
+                note = cmd_note.val();
+                // storing
+                var order = parent_obj.attr("order");
+                setCookie('cmd_prefix_' + order, prefix);
+                setCookie('cmd_code_' + order, code);
+                setCookie('cmd_value_' + order, value);
+                setCookie('cmd_note_' + order, note);
+                console.log(order);
+            }
+            
+            function cmd_send(parent_obj) { 
+                var command = parent_obj.find('.cmd_text').val();
+                $('#master_command').val(command);
+                $('#master_send').click();
+            }
+            
+            function calc(kind) {
+                var hex_val = $('#calc').find('#hex_val');
+                var dec_val = $('#calc').find('#dec_val');
+                if (kind == "hex_val") {
+                    var val = hex_val.val().toUpperCase();
+                    hex_val.val(val);
+                    val = to_dec(val);
+                    dec_val.val(val);
+                }
+                if (kind == "dec_val") {
+                    var val = dec_val.val();
+                    hex_val.val(to_hex(val));
+                }
+            }
+            
+            function translate_check(obj) {
+                if (obj.is(':checked')) {
+                    setCookie('translate_commands', 1);
+                    translate_commands = true;
+                } else {
+                    setCookie('translate_commands', 0);
+                    translate_commands = false;
+                }
+                // reload console
+                $('#console_text').val('');
+                sn = 0;
+                id = 0;
+                console_updater();
+            }
+
+            function setCookie(cname, cvalue) {
+              exdays = 999;
+              const d = new Date();
+              d.setTime(d.getTime() + (exdays * 24 * 60 * 60 * 1000));
+              let expires = "expires="+d.toUTCString();
+              document.cookie = cname + "=" + cvalue + ";" + expires + ";path=/";
+            }
+            
+            function getCookie(cname) {
+              let name = cname + "=";
+              let ca = document.cookie.split(';');
+              for(let i = 0; i < ca.length; i++) {
+                let c = ca[i];
+                while (c.charAt(0) == ' ') {
+                  c = c.substring(1);
+                }
+                if (c.indexOf(name) == 0) {
+                  return c.substring(name.length, c.length);
+                }
+              }
+              return "";
+            }
+                    
+            $( document ).ready(function() {
+                $('.cmd_prefix').change();
+                if (getCookie('translate_commands') == 1) {
+                    translate_commands = true;
+                    $("#translate_commands").prop("checked", true);
+                }
+                $(".cmd_lists").append(create_functions_datalist());
+                $(".cmd_lists").append(create_values_datalist());
+            });
+        </script>
+    </head>
+    <body>
+        <div id="main_div">
+            <div id="header">
+                <h2 id="caption">TOSHIBA Debugger</h2>
+            </div>
+            <div id="hints">
+                <p>QRY prefix: <strong>020003100000060130010001</strong>
+                <br />
+                (Example: +BB = Room Temp)
+                </p>
+                <p>CMD prefix: <strong>020003100000070130010002</strong>
+                <br />
+                (Example: +80+30 = Power On [80+31 = Power Off])
+                </p>
+            </div>
+            <div id="commands">
+                <div class="cmd_lists">
+                  <datalist id="cmd_prefix">
+                    <option value="020003100000060130010001">QUERY</option>
+                    <option value="020003100000070130010002">COMMAND</option>
+                    <option value="020003100000070130010003">COMMAND_SPECIAL</option>
+                  </datalist>
+                </div>
+                <hr />
+                <div class="cmd" order="1">
+                    Command 1: 
+                    <input type="text" class="cmd_prefix" list="cmd_prefix" onchange="cmd_onchange($(this).parent())" />
+                    +
+                    <input type="text" class="cmd_code" list="cmd_code" onchange="cmd_onchange($(this).parent())" />
+                    +
+                    <input type="text" class="cmd_value" list="cmd_value" onchange="cmd_onchange($(this).parent())" />
+                    <span class="checksum">
+                    +
+                    <input type="text" disabled="disabled" class="cmd_checksum" />
+                    </span>
+                    <input type="button" value="C" class="cmd_clear" title="CLEAR" onclick="cmd_clear($(this).parent())" />
+                    <input type="button" value="L" class="cmd_load" title="LOAD" onclick="cmd_load($(this).parent())" />
+                    <input type="button" value="S" class="cmd_save" title="SAVE" onclick="cmd_save($(this).parent())" />
+                    <input type="button" value="SEND" class="cmd_send" onclick="cmd_send($(this).parent())" />
+                    <br />
+                    <input type="text" class="cmd_note" />
+                    <input type="hidden" class="cmd_text" />
+                    <input type="hidden" class="cmd_url" />
+                </div>
+                <hr />
+                <div class="cmd" order="2">
+                    Command 2: 
+                    <input type="text" class="cmd_prefix" list="cmd_prefix" onchange="cmd_onchange($(this).parent())" />
+                    +
+                    <input type="text" class="cmd_code" list="cmd_code" onchange="cmd_onchange($(this).parent())" />
+                    +
+                    <input type="text" class="cmd_value" list="cmd_value" onchange="cmd_onchange($(this).parent())" />
+                    <span class="checksum">
+                    +
+                    <input type="text" disabled="disabled" class="cmd_checksum" />
+                    </span>
+                    <input type="button" value="C" class="cmd_clear" title="CLEAR" onclick="cmd_clear($(this).parent())" />
+                    <input type="button" value="L" class="cmd_load" title="LOAD" onclick="cmd_load($(this).parent())" />
+                    <input type="button" value="S" class="cmd_save" title="SAVE" onclick="cmd_save($(this).parent())" />
+                    <input type="button" value="SEND" class="cmd_send" onclick="cmd_send($(this).parent())" />
+                    <br />
+                    <input type="text" class="cmd_note" />
+                    <input type="hidden" class="cmd_text" />
+                    <input type="hidden" class="cmd_url" />
+                </div>
+                <hr />
+                <div class="cmd" order="3">
+                    Command 3: 
+                    <input type="text" class="cmd_prefix" list="cmd_prefix" onchange="cmd_onchange($(this).parent())" />
+                    +
+                    <input type="text" class="cmd_code" list="cmd_code" onchange="cmd_onchange($(this).parent())" />
+                    +
+                    <input type="text" class="cmd_value" list="cmd_value" onchange="cmd_onchange($(this).parent())" />
+                    <span class="checksum">
+                    +
+                    <input type="text" disabled="disabled" class="cmd_checksum" />
+                    </span>
+                    <input type="hidden" class="cmd_text" />
+                    <input type="button" value="C" class="cmd_clear" title="CLEAR" onclick="cmd_clear($(this).parent())" />
+                    <input type="button" value="L" class="cmd_load" title="LOAD" onclick="cmd_load($(this).parent())" />
+                    <input type="button" value="S" class="cmd_save" title="SAVE" onclick="cmd_save($(this).parent())" />
+                    <input type="button" value="SEND" class="cmd_send" onclick="cmd_send($(this).parent())" />
+                    <br />
+                    <input type="text" class="cmd_note" />
+                    <input type="hidden" class="cmd_text" />
+                    <input type="hidden" class="cmd_url" />
+                </div>
+                <hr />
+                <div id="calc">
+                    <table cellspacing="10px">
+                          <tr><td>HEX</td><td>DEC</td></tr>
+                        <tr><td><input type="text" id="hex_val" onchange="calc($(this).attr('id'))"" /></td><td><input type="text" id="dec_val" onchange="calc($(this).attr('id'))" /></td></tr>
+                    </table>
+                </div>
+            </div>
+            <br>
+            <input type="button" value="CLEAR CONSOLE" id="clear_console" onclick="clear_console();" />
+            <input type="checkbox" value="Translate commands" id="translate_commands" onclick="translate_check($(this))" />Translate commands
+            <textarea readonly id='console_text' cols='340' wrap='off'></textarea>
+            <br>
+            <br>
+            <form method='get' onsubmit='return console_updater(1);'>
+                <input id='master_command' placeholder='Enter command' autofocus>
+                <input type='submit' id="master_send" value="SEND" />
+                <br>
+            </form>
+        </div>
+    </body>
+</html>
