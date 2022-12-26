@@ -21,23 +21,27 @@
 	$admin = 'IntEx';
 
 	/* Function constants (decimal) */
-	$function_codes['TEMP_PRESET']	= '179'; // 17-32 degrees
-	$function_codes['TEMP_INDOOR']	= '187';
-	$function_codes['TEMP_OUTDOOR'] = '190';
-	$function_codes['POWER_STATE']	= '128';
-	$function_codes['POWER_SEL']	= '135'; // 50/75/100
-	$function_codes['TIMER_ON']		= '144';
-	$function_codes['TIMER_OFF']	= '148';
-	$function_codes['FAN_MODE']		= '160';
-	$function_codes['SWING_STATE']	= '163';
-	$function_codes['UNIT_MODE']	= '176';
-	$function_codes['SPECIAL_MODE'] = '247';
+	$function_codes['TEMP_SETPOINT']		= '179'; // 17-32 degrees
+	$function_codes['TEMP_INDOOR']		= '187';
+	$function_codes['TEMP_OUTDOOR']		= '190';
+	$function_codes['POWER_STATE']		= '128';
+	$function_codes['POWER_SEL']		= '135'; // 50/75/100
+	$function_codes['TIMER_ON']			= '144';
+	$function_codes['TIMER_OFF']		= '148';
+	//$function_codes['CFTSLP_TIME']	= '150';
+	$function_codes['FAN_MODE']			= '160';
+	$function_codes['SWING_STATE']		= '163';
+	$function_codes['UNIT_MODE']		= '176';
+	$function_codes['TEMP_EXCHANGER']	= '176';
+	$function_codes['SPECIAL_MODE']		= '247';
+
 
 	$function_values['POWER_STATE'] 	= array('0' => '-', '48' => 'ON', '49' => 'OFF');
 	$function_values['FAN_MODE']		= array('0' => '-', '49' => 'QUIET', '50' => '1', '51' => '2', '52' => '3', '53' => '4', '54' => '5', '65' => 'AUTO');
 	$function_values['SWING_STATE'] 	= array('0' => '-', '49' => 'OFF', '65' => 'ON');
 	$function_values['UNIT_MODE']		= array('0' => '-', '65' => 'AUTO', '66' => 'COOL', '67' => 'HEAT', '68' => 'DRY', '69' => 'FAN');
 	$function_values['POWER_SEL']		= array('50' => '50%', '75' => '75%', '100' => '100%');
+	//$function_values['CFTSLP_TIME']     = array('1' => '1H', '3' => '3H', '5' => '5H', '9' => '9H');
 	$function_values['SPECIAL_MODE']	= array('0' => '-', '1' => 'HIPOWER', '3' => 'ECO/CTSP', '4' => '8C', '2' => 'SILENT-1', '10' => 'SILENT-2', '32' => 'FRPL1', '48' => 'FRPL2'); // CTSP = Comfort Sleep
 	$function_values['TIMER_ON']		= array('65' => 'ON', '66' => 'OFF');
 	$function_values['TIMER_OFF']		= array('65' => 'ON', '66' => 'OFF');
@@ -152,7 +156,7 @@
 		global $function_codes, $function_values;
 		global $hvac_command_retries;
 		$original_input_value = $input_value; // for eventual retry
-        $control_command_prefix = '020003100000070130010002';
+		$control_command_prefix = '020003100000070130010002';
 		$command_result_variable = 'Var3';
 		if (!$response_only) {
 			if ($input_function == 'SPECIAL_MODE' && strpos($input_value, 'SILENT') !== false)
@@ -160,7 +164,7 @@
 			// prepare command
 			$control_command = $control_command_prefix;
 			$control_command .= to_hex($function_codes[$input_function]); // function code
-			if ($input_function != 'TEMP_PRESET')
+			if ($input_function != 'TEMP_SETPOINT')
 				$input_value = array_search($input_value, $function_values[$input_function]);
 			$control_command .= to_hex($input_value); // value
 			$control_command .= hvac_checksum($control_command);
@@ -277,7 +281,14 @@
 		header("HVAC-Query-Retries: ".implode(', ', $hvac_query_retries));
 		echo json_encode($states);
 		exit;
-	} 
+	}
+
+	// calculate HEX checksum
+	$getchecksum = isset($_GET['getchecksum']) ? $_GET['getchecksum'] : -1;
+	if ($getchecksum != -1) {
+		echo hvac_checksum($getchecksum);
+		exit;
+	}
 
 	// send command
 	$sendcmd = isset($_GET['sendcmd']) ? $_GET['sendcmd'] : -1;
@@ -290,22 +301,22 @@
 		}
 		$sendcmd = strtoupper($sendcmd);
 		$cmdval = strtoupper($cmdval);
-		if ($sendcmd == 'TEMP_PRESET') {
+		if ($sendcmd == 'TEMP_SETPOINT') {
 			$cmdresult[$sendcmd.':'.$cmdval] = !is_numeric($cmdval) ? 'INVALID_TEMP' : hvac_command($sendcmd, $cmdval);
 		} else {
 			if (!array_key_exists($sendcmd, $function_values)) {
 				if (is_numeric($sendcmd)) {
-                    // manual command number
-                    $cmdresult[$sendcmd.':'.$cmdval] = hvac_command($sendcmd, $cmdval);
-                } else {
-                    // command not known
-                    $cmdresult[$sendcmd] = 'UNKNOWN_COMMAND';
-                }
+					// manual command number
+					$cmdresult[$sendcmd.':'.$cmdval] = hvac_command($sendcmd, $cmdval);
+				} else {
+					// command not known
+					$cmdresult[$sendcmd] = 'UNKNOWN_COMMAND';
+				}
 			} else {
-                // known command
+				// known command
 				$cmdresult[$sendcmd.':'.$cmdval] = !is_numeric(array_search($cmdval, $function_values[$sendcmd])) ? 'INVALID_VALUE' : hvac_command($sendcmd, $cmdval);
-		    }
-        }
+			}
+		}
 		header("AC-Command-Retries: ".implode(', ', $hvac_command_retries));
 		echo json_encode($cmdresult);
 		exit;
@@ -317,7 +328,7 @@
 		echo "Setup commands sent to '$tasmota_host'.";
 		exit;
 	}
-    
+
 	// get custom state
 	$debugstate = isset($_GET['debugstate']) ? $_GET['debugstate'] : -1; 
 	$numretries = isset($_GET['numretries']) ? $_GET['numretries'] : -1;

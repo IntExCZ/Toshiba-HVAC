@@ -6,13 +6,13 @@ import json
 debug = False
 
 # Tasmota parametes
-tasmota_host = '192.168.1.101'
+tasmota_host = '172.0.0.105'
 tasmota_username = 'admin'
-tasmota_password = '12345'
+tasmota_password = 'xetnipc'
 
 ## Function constants (decimal) ##
 function_codes = {}
-function_codes['TEMP_PRESET']  = '179' # 17-32 degrees
+function_codes['TEMP_SETPOINT']  = '179' # 17-32 degrees
 function_codes['TEMP_INDOOR']  = '187'
 function_codes['TEMP_OUTDOOR'] = '190'
 function_codes['POWER_STATE']  = '128'
@@ -131,7 +131,7 @@ def ac_command(input_function, input_value, num_retries = 4, retry_counter = 0, 
         # prepare command
         control_command = control_command_prefix
         control_command += decstr_to_hexstr(function_codes[input_function]) # function code
-        if (input_function != 'TEMP_PRESET'):
+        if (input_function != 'TEMP_SETPOINT'):
             input_value = list(function_values[input_function].keys())[list(function_values[input_function].values()).index(input_value)]
         control_command += decstr_to_hexstr(input_value) # value
         control_command += ac_checksum(control_command)
@@ -203,5 +203,5 @@ def ac_query(input_function, num_retries = 4, retry_counter = 0, response_only =
 ## MAIN BODY ##
 for key in function_codes:
     print(key + ": " + str(ac_query(key)))
-#print(str(ac_query('TEMP_PRESET')))   
+#print(str(ac_query('TEMP_SETPOINT')))   
 print(str(ac_command('POWER_STATE', 'OFF')))
