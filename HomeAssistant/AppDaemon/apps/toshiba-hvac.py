@@ -29,11 +29,11 @@ class Toshiba_HVAC(mqtt.Mqtt):
   temps_polling_sec = None
 
   # States for HA
-  states = {'POWER_STATE', 'UNIT_MODE', 'POWER_SEL', 'SPECIAL_MODE', 'FAN_MODE', 'SWING_STATE', 'TEMP_PRESET', 'TEMP_INDOOR', 'TEMP_OUTDOOR', 'TIMER_ON', 'TIMER_OFF'}
+  states = {'POWER_STATE', 'UNIT_MODE', 'POWER_SEL', 'SPECIAL_MODE', 'FAN_MODE', 'SWING_STATE', 'TEMP_SETPOINT', 'TEMP_INDOOR', 'TEMP_OUTDOOR', 'TIMER_ON', 'TIMER_OFF'}
   
   # HVAC function codes (decimal)
   function_codes = {
-    'TEMP_PRESET':  '179', # 17-32 degrees
+    'TEMP_SETPOINT':  '179', # 17-32 degrees
     'TEMP_INDOOR':  '187',
     'TEMP_OUTDOOR': '190',
     'POWER_STATE':  '128',
@@ -92,8 +92,8 @@ class Toshiba_HVAC(mqtt.Mqtt):
       "mode_command_topic": f"{self.topic_prefix}/UNIT_MODE/set",
       "mode_state_topic": f"{self.topic_prefix}/UNIT_MODE/state",
       "current_temperature_topic": f"{self.topic_prefix}/TEMP_INDOOR",
-      "temperature_command_topic": f"{self.topic_prefix}/TEMP_PRESET/set",
-      "temperature_state_topic": f"{self.topic_prefix}/TEMP_PRESET/state",
+      "temperature_command_topic": f"{self.topic_prefix}/TEMP_SETPOINT/set",
+      "temperature_state_topic": f"{self.topic_prefix}/TEMP_SETPOINT/state",
       "fan_mode_command_topic": f"{self.topic_prefix}/FAN_MODE/set",
       "fan_mode_state_topic": f"{self.topic_prefix}/FAN_MODE/state",
       "swing_mode_command_topic": f"{self.topic_prefix}/SWING_STATE/set",
@@ -180,16 +180,16 @@ class Toshiba_HVAC(mqtt.Mqtt):
       }
     }
     self.discovery_create_control('select', object_id, config)
-    # TEMP_PRESET input
-    object_id = unique_name + "_temp_preset"
+    # TEMP_SETPOINT input
+    object_id = unique_name + "_temp_setpoint"
     config = {
       "object_id": object_id,
       "unique_id": object_id,
       "name": f"{self.room_name} HVAC Temperature Setting",
       "icon": "mdi:thermometer-lines",
       "availability_topic": f"{self.topic_prefix}/connection_state",
-      "command_topic": f"{self.topic_prefix}/TEMP_PRESET/set",
-      "state_topic": f"{self.topic_prefix}/TEMP_PRESET/state",
+      "command_topic": f"{self.topic_prefix}/TEMP_SETPOINT/set",
+      "state_topic": f"{self.topic_prefix}/TEMP_SETPOINT/state",
       "min": "17",
       "max": "32",
       "unit_of_measurement": "°C",
@@ -664,7 +664,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
       control_command = control_command_prefix
       control_command += self.decstr_to_hexstr(self.function_codes[input_function]) # function code
       # try parse input value
-      if (input_function != 'TEMP_PRESET'):
+      if (input_function != 'TEMP_SETPOINT'):
         try:
           input_value = list(self.function_values[input_function].keys())[list(self.function_values[input_function].values()).index(input_value)]
         except:
