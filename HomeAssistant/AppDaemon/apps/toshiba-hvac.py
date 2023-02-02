@@ -87,8 +87,9 @@ class Toshiba_HVAC(mqtt.Mqtt):
       "max_temp": "32",
       "fan_modes": ["QUIET", "1", "2", "3", "4", "5","AUTO"],
       "availability_topic": f"{self.topic_prefix}/connection_state",
-      "power_command_topic": f"{self.topic_prefix}/POWER_STATE/set",
-      "power_state_topic": f"{self.topic_prefix}/POWER_STATE/state",
+      # deprecated from HA 2023.2
+      #"power_command_topic": f"{self.topic_prefix}/POWER_STATE/set",
+      #"power_state_topic": f"{self.topic_prefix}/POWER_STATE/state",
       "mode_command_topic": f"{self.topic_prefix}/UNIT_MODE/set",
       "mode_state_topic": f"{self.topic_prefix}/UNIT_MODE/state",
       "current_temperature_topic": f"{self.topic_prefix}/TEMP_INDOOR",
@@ -471,10 +472,10 @@ class Toshiba_HVAC(mqtt.Mqtt):
     topic = self.topic_prefix + "/" + state + "/state" # this MQTT topic
     # value correction
     if (state == "UNIT_MODE" and value == "off"):
-      # dummy mode for power off (HA triggering POWER_STATE to "OFF" by itself)
+      # HA setting UNIT_MODE to OFF instead of (deprecated from 2023.2) POWER_STATE to OFF
       self.mqtt_publish(topic, value, qos=1, namespace="mqtt")
-      self.log_debug("Power off, no action")
-      return False
+      self.log_debug("Unit mode off => power off")
+      return self.set_state("POWER_STATE", "OFF")
     self.log_set(f"{state}: {value}") 
     if ("." in value):
       value = str(int(float(value)))
