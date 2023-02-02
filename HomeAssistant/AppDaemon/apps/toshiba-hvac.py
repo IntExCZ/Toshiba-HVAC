@@ -1,5 +1,6 @@
 import mqttapi as mqtt
 import adbase as ad
+import sys
 import json
 import datetime
 import re # regular expressions
@@ -15,6 +16,8 @@ class Toshiba_HVAC(mqtt.Mqtt):
   tasmota_username = "admin"
 
   callback_lock = False # avoid callback locking to avoid concurrent runnings
+  callback_lock_source = None # what set the callback lock
+  callback_lock_time = None # when was the callback lock set
   is_connected = None # connection state reported by tasmota_send()
 
   # configuration values
@@ -371,7 +374,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
       else:
         self.log_main("ERROR: States refresh failed")
     else:
-      self.log_debug("Refresh requsest omitted")
+      self.log_debug("Refresh request omitted")
 
   # Handle MQTT setting event  
   def event_received(self, event_name, data, kwargs):
@@ -384,28 +387,62 @@ class Toshiba_HVAC(mqtt.Mqtt):
       return
     self.set_state(state, value)
 
+  # Control callback locking 
+  # returns: [bool] lock set
+  def set_callback_lock(self, set):
+    self.log_debug(f"set_callback_lock('{set}')")
+    if (set and self.callback_lock):
+      self.log_debug(f"Callback lock is already SET (on {self.callback_lock_time} by {self.callback_lock_source})")
+      return set
+    caller = sys._getframe(1).f_code.co_name + "()" # calling function name
+    self.callback_lock = set # modify callback lock
+    if (set):
+      self.callback_lock_source = caller
+      self.callback_lock_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+      self.log_debug(f"Callback lock was SET by {caller}")
+    else:
+      self.callback_lock_source = None
+      self.callback_lock_time = None
+      self.log_debug(f"Callback lock was RELEASED by {caller}")
+    return set
+  
+  # Get state of callback locking 
+  # returns: [bool] lock set
+  def get_callback_lock(self):
+    self.log_debug(f"get_callback_lock()")
+    if (self.callback_lock):
+      self.log_debug(f"Callback lock is SET (on {self.callback_lock_time} by {self.callback_lock_source})")
+    else:
+      self.log_debug("Callback lock is RELEASED")
+    return self.callback_lock
+
+
   # Get state from HVAC and publish to MQTT  
   # returns: [str] state result
   def get_state(self, state):
     self.log_debug(f"get_state('{state}')")
+    topic = self.topic_prefix + "/" + state + "/state"
     # GET HVAC STATE
-    result = self.hvac_query(state)
-    result = str(result) # all states as string including errors for easy final evaluation
-    if (result.lower() == "false"):
-      self.log_hvac(f"ERROR: State query failed ({state})")
-      self.log_debug("No result")
-      return result
-    if (result == "-" and state != "SPECIAL_MODE"):
-      self.log_debug("Unknown state")
-      return result
-    # convert for MQTT (HA)
-    if (state == "UNIT_MODE" or state == "SWING_STATE"):
-      result = result.lower()
+    # handle HA unit mode on powered off unit (do not query real unit mode when power is off)
+    if (state == "UNIT_MODE" and self.get_state('POWER_STATE') == 'OFF'):
+      result = 'off' # unit mode is for HA off
+      self.log_debug("Power is off => UNIT_MODE = off")
+    else:
+      result = self.hvac_query(state)
+      result = str(result) # all states as string including errors for easy final evaluation
+      if (result.lower() == "false"):
+        self.log_hvac(f"ERROR: State query failed ({state})")
+        self.log_debug("No result")
+        return result
+      if (result == "-" and state != "SPECIAL_MODE"):
+        self.log_debug("Unknown state")
+        return result
+      # adapt for MQTT (HA)
+      if (state == "UNIT_MODE" or state == "SWING_STATE"):
+        result = result.lower()
+      if (state == "TEMP_INDOOR" or state == "TEMP_OUTDOOR" or 'TIMER_' in state):
+        topic = self.topic_prefix + "/" + state # read-only values
     # publish to MQTT
-    if (state == "TEMP_INDOOR" or state == "TEMP_OUTDOOR" or 'TIMER_' in state):
-      topic = self.topic_prefix + "/" + state # read-only values
-    else:  
-      topic = self.topic_prefix + "/" + state + "/state"
     self.mqtt_publish(topic, result, qos=1, namespace="mqtt")
     self.log_hvac(f"Query success ({state}: {result})")
     self.log_debug(f"{state}: {result}")
@@ -414,55 +451,57 @@ class Toshiba_HVAC(mqtt.Mqtt):
   # Get all states one by one (app_lock for polling to avoid concurrent runs)
   # returns: [bool] success
   def get_all_states(self, kwargs = None):
-    self.log_debug(f"get_all_states()")
-    if (self.callback_lock):
-      self.log_main("Callback lock is set, skipping get_all_states() run")
+    self.log_debug(f"get_all_states()") 
+    if (self.get_callback_lock()):
+      self.log_debug("Skipping get_all_states() run")
       return False # avoid callback conflicts
-    self.callback_lock = True
+    self.set_callback_lock(True)
     power_state = self.get_state('POWER_STATE')
     if (power_state.lower() == "false"): 
-      self.callback_lock = False
+      self.set_callback_lock(False)
       return False # connection error, skip state querying
     for state in self.states:
       if (state == "POWER_STATE"):
-          continue # the state is previously known
-      if (power_state == 'OFF' and state == 'UNIT_MODE'):
-        self.set_state('UNIT_MODE', 'off')
-        self.log_debug("UNIT_MODE to off due to to power off")
-        continue # HA mode setting workaround (one of unit modes is power off)
+          continue # the state is previously known (variable power_state)
       result = self.get_state(state)
       if (result.lower() == "false"):
-        self.callback_lock = False
+        self.set_callback_lock(False)
         return False # connection error, skip state querying
     topic = self.topic_prefix + "/last_refresh"
-    #value = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     value = datetime.datetime.now().strftime("%H:%M:%S")
     self.mqtt_publish(topic, value, qos=1, namespace="mqtt")
-    self.callback_lock = False
+    self.set_callback_lock(False)
     return True #
 
   # Get temperature values (app_lock for polling to avoid concurrent runs)
   # returns: [bool] success
   def get_temps(self, kwargs = None):
     self.log_debug(f"get_temps()")
-    if (self.callback_lock):
-      self.log_main("Callback lock is set, skipping get_temps() run")
+    if (self.get_callback_lock()):
+      self.log_debug("Skipping get_temps() run")
       return False # avoid callback conflicts
-    self.callback_lock = True
+    self.set_callback_lock(True)
     self.get_state('TEMP_INDOOR')
     self.get_state('TEMP_OUTDOOR')
-    self.callback_lock = False
+    self.set_callback_lock(False)
     return True
 
   # Get timer states
   # returns: [bool] any timer is ON
   def get_timers(self, kwargs = None):
     self.log_debug(f"get_timers()")
+    if (self.get_callback_lock()):
+      self.log_debug("Skipping get_timers() run")
+      return False # avoid callback conflicts
     # off timer is more common
+    self.set_callback_lock(True)
     if (self.get_state('TIMER_OFF') == 'ON'):
+      self.set_callback_lock(False)
       return True
     if (self.get_state('TIMER_ON') == 'ON'):
+      self.set_callback_lock(False)
       return True
+    self.set_callback_lock(False)
     return False
 
   # Set value to state and get actual (new) state from HVAC
@@ -470,12 +509,21 @@ class Toshiba_HVAC(mqtt.Mqtt):
   def set_state(self, state, value):
     self.log_debug(f"set_state('{state}', '{value}')")
     topic = self.topic_prefix + "/" + state + "/state" # this MQTT topic
-    # value correction
-    if (state == "UNIT_MODE" and value == "off"):
-      # HA setting UNIT_MODE to OFF instead of (deprecated from 2023.2) POWER_STATE to OFF
-      self.mqtt_publish(topic, value, qos=1, namespace="mqtt")
-      self.log_debug("Unit mode off => power off")
-      return self.set_state("POWER_STATE", "OFF")
+    # UNIT_MODE handling
+    if (state == "UNIT_MODE"):
+      power_state = self.get_state('POWER_STATE')
+      if (value == "off"):
+        # HA setting UNIT_MODE to OFF instead of (deprecated from HA 2023.2) POWER_STATE to OFF
+        self.mqtt_publish(topic, value, qos=1, namespace="mqtt")
+        if (power_state == 'ON'):
+          self.log_debug("Unit mode set to off => power off")
+          self.set_state("POWER_STATE", "OFF") # power unit off if is on
+        return True
+      else:
+          # power on unit when setting different UNIT_MODE
+          if (power_state == 'OFF'):
+             self.log_debug("Power is off => power on")
+             self.set_state("POWER_STATE", "ON") # power unit on if is off
     self.log_set(f"{state}: {value}") 
     if ("." in value):
       value = str(int(float(value)))
@@ -504,9 +552,9 @@ class Toshiba_HVAC(mqtt.Mqtt):
     # adapt UNIT_MODE state to POWER_STATE
     if (state == "POWER_STATE"):
       if (value == "ON"):
-        self.get_state("UNIT_MODE") # get real state after manual powering on
+        self.get_state("UNIT_MODE") # get real unit mode after manual powering on
       if (value == "OFF"):
-        self.set_state("UNIT_MODE", "off") # adjust unit mode
+        self.set_state("UNIT_MODE", "off") # adapt unit mode
     return True
 
   # Get connection state / report connection state to log/MQTT
