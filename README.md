@@ -6,6 +6,10 @@ For Toshiba Shorai-Edge compatible units.
 
 Home Assistant integration based on AppDaemon Python/MQTT control script.
 
+<code>**IMPORTANT NOTE: New AppDaemon versions (newer than 0.16.7) still contains a <a href="https://github.com/AppDaemon/appdaemon/issues/2343" target="_blank">"Pin thread -1" bug</a>, so please stay on this older AD versions.**</code>
+
+#0f0[This is green text]
+
 I will add instructions, but if someone interested can help me, I will appreciate it. ;-)
 
 ![Installation](/images/installation.jpg)  
