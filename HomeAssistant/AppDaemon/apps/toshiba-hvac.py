@@ -10,7 +10,7 @@ import unicodedata
 
 class Toshiba_HVAC(mqtt.Mqtt):
 
-  # runtime variables
+  # runtime constants
   topic_group = "toshiba-hvac"
   topic_prefix = None # toshiba-hvac/pracovna
   tasmota_username = "admin"
@@ -31,8 +31,12 @@ class Toshiba_HVAC(mqtt.Mqtt):
   full_polling_sec = None
   temps_polling_sec = None
 
+  # linked HVAC
+  room_name_linked = None
+  topic_prefix_linked = None
+
   # States for HA
-  states = {'POWER_STATE', 'UNIT_MODE', 'POWER_SEL', 'SPECIAL_MODE', 'FAN_MODE', 'SWING_STATE', 'TEMP_SETPOINT', 'TEMP_INDOOR', 'TEMP_OUTDOOR', 'TIMER_ON', 'TIMER_OFF'}
+  states = {'POWER_STATE', 'UNIT_MODE', 'POWER_SEL', 'SPECIAL_MODE', 'FAN_MODE', 'SWING_STATE', 'TEMP_SETPOINT', 'TEMP_INDOOR', 'TEMP_OUTDOOR', 'TIMER_ON', 'TIMER_OFF', 'WIFI_LED'}
   
   # HVAC function codes (decimal)
   function_codes = {
@@ -46,6 +50,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
     'FAN_MODE':     '160',
     'SWING_STATE':  '163',
     'UNIT_MODE':    '176',
+    'WIFI_LED':     '223',
     'SPECIAL_MODE': '247'
   }
 
@@ -58,7 +63,8 @@ class Toshiba_HVAC(mqtt.Mqtt):
     'POWER_SEL':    {'50':'50', '75':'75', '100':'100'}, # adapted to HA states
     'SPECIAL_MODE': {'0':'-', '1':'HIPOWER', '3':'ECO/CFTSLP', '4':'8C', '2':'SILENT1', '10':'SILENT2', '32':'FRPL1', '48':'FRPL2'},
     'TIMER_ON':     {'65':'ON', '66':'OFF'},
-    'TIMER_OFF':    {'65':'ON', '66':'OFF'}
+    'TIMER_OFF':    {'65':'ON', '66':'OFF'},
+    'WIFI_LED':     {'0': 'ON', '1':'FAST', '3':'SLOW', '5': 'OFF'}
   }
 
 
@@ -74,13 +80,14 @@ class Toshiba_HVAC(mqtt.Mqtt):
   def discovery_config(self):
     self.log_debug(f"set_discovery_config()")
     unique_name = self.normalize_string(f"{self.room_name}-hvac")
+    name = "HVAC"
     # Climate device
     config = {
-      "name": self.room_name,
-      "unique_id": unique_name,
+      "name": f"{name}",
+      "unique_id": f"{unique_name}",
       "device": {
-        "name": f"{self.room_name} HVAC",
-        "identifiers": unique_name,
+        "name": f"{self.room_name}",
+        "identifiers": f"{unique_name}",
         "manufacturer": "Tasmota",
         "model": "Toshiba",
         "configuration_url": f"http://{self.tasmota_host}"
@@ -90,9 +97,6 @@ class Toshiba_HVAC(mqtt.Mqtt):
       "max_temp": "32",
       "fan_modes": ["QUIET", "1", "2", "3", "4", "5","AUTO"],
       "availability_topic": f"{self.topic_prefix}/connection_state",
-      # deprecated from HA 2023.2
-      #"power_command_topic": f"{self.topic_prefix}/POWER_STATE/set",
-      #"power_state_topic": f"{self.topic_prefix}/POWER_STATE/state",
       "mode_command_topic": f"{self.topic_prefix}/UNIT_MODE/set",
       "mode_state_topic": f"{self.topic_prefix}/UNIT_MODE/state",
       "current_temperature_topic": f"{self.topic_prefix}/TEMP_INDOOR",
@@ -105,11 +109,11 @@ class Toshiba_HVAC(mqtt.Mqtt):
     }
     self.discovery_create_control('climate', unique_name, config)
     # POWER_STATE switch
-    object_id = unique_name + "_power_state"
+    default_entity_id = unique_name + "_power_state"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Power State",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Power State",
       "icon": "mdi:power",
       "availability_topic": f"{self.topic_prefix}/connection_state",
       "command_topic": f"{self.topic_prefix}/POWER_STATE/set",
@@ -118,13 +122,13 @@ class Toshiba_HVAC(mqtt.Mqtt):
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('switch', object_id, config)
+    self.discovery_create_control('switch', default_entity_id, config)
     # SWING_STATE switch
-    object_id = unique_name + "_swing_state"
+    default_entity_id = unique_name + "_swing_state"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Swing State",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Swing State",
       "icon": "mdi:wall-sconce-flat",
       "availability_topic": f"{self.topic_prefix}/connection_state",
       "command_topic": f"{self.topic_prefix}/SWING_STATE/set",
@@ -135,13 +139,13 @@ class Toshiba_HVAC(mqtt.Mqtt):
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('switch', object_id, config)
+    self.discovery_create_control('switch', default_entity_id, config)
     # UNIT_MODE selector
-    object_id = unique_name + "_unit_mode"
+    default_entity_id = unique_name + "_unit_mode"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Unit Mode",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Unit Mode",
       "icon": "mdi:cog",
       "availability_topic": f"{self.topic_prefix}/connection_state",
       "command_topic": f"{self.topic_prefix}/UNIT_MODE/set",
@@ -151,13 +155,13 @@ class Toshiba_HVAC(mqtt.Mqtt):
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('select', object_id, config)
+    self.discovery_create_control('select', default_entity_id, config)
     # FAN_MODE selector
-    object_id = unique_name + "_fan_mode"
+    default_entity_id = unique_name + "_fan_mode"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Fan Mode",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Fan Mode",
       "icon": "mdi:fan",
       "availability_topic": f"{self.topic_prefix}/connection_state",
       "command_topic": f"{self.topic_prefix}/FAN_MODE/set",
@@ -167,13 +171,13 @@ class Toshiba_HVAC(mqtt.Mqtt):
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('select', object_id, config)
+    self.discovery_create_control('select', default_entity_id, config)
     # SPECIAL_MODE selector
-    object_id = unique_name + "_special_mode"
+    default_entity_id = unique_name + "_special_mode"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Special Mode",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Special Mode",
       "icon": "mdi:dots-horizontal-circle-outline",
       "availability_topic": f"{self.topic_prefix}/connection_state",
       "command_topic": f"{self.topic_prefix}/SPECIAL_MODE/set",
@@ -183,13 +187,13 @@ class Toshiba_HVAC(mqtt.Mqtt):
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('select', object_id, config)
+    self.discovery_create_control('select', default_entity_id, config)
     # TEMP_SETPOINT input
-    object_id = unique_name + "_temp_setpoint"
+    default_entity_id = unique_name + "_temp_setpoint"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Temperature Setting",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Temperature Setting",
       "icon": "mdi:thermometer-lines",
       "availability_topic": f"{self.topic_prefix}/connection_state",
       "command_topic": f"{self.topic_prefix}/TEMP_SETPOINT/set",
@@ -201,13 +205,13 @@ class Toshiba_HVAC(mqtt.Mqtt):
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('number', object_id, config)
+    self.discovery_create_control('number', default_entity_id, config)
     # POWER_SEL input
-    object_id = unique_name + "_power_sel"
+    default_entity_id = unique_name + "_power_sel"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Power Selection",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Power Selection",
       "icon": "mdi:signal-cellular-2",
       "availability_topic": f"{self.topic_prefix}/connection_state",
       "command_topic": f"{self.topic_prefix}/POWER_SEL/set",
@@ -220,13 +224,13 @@ class Toshiba_HVAC(mqtt.Mqtt):
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('number', object_id, config)
+    self.discovery_create_control('number', default_entity_id, config)
     # TEMP_INDOOR sensor
-    object_id = unique_name + "_temp_indoor"
+    default_entity_id = unique_name + "_temp_indoor"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Indoor Temperature",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Indoor Temperature",
       "availability_topic": f"{self.topic_prefix}/connection_state",
       "state_topic": f"{self.topic_prefix}/TEMP_INDOOR",
       "state_class": "measurement", 
@@ -236,13 +240,13 @@ class Toshiba_HVAC(mqtt.Mqtt):
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('sensor', object_id, config)
+    self.discovery_create_control('sensor', default_entity_id, config)
     # TEMP_OUTDOOR sensor
-    object_id = unique_name + "_temp_outdoor"
+    default_entity_id = unique_name + "_temp_outdoor"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Outdoor Temperature",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Outdoor Temperature",
       "availability_topic": f"{self.topic_prefix}/connection_state",
       "state_topic": f"{self.topic_prefix}/TEMP_OUTDOOR",
       "state_class": "measurement", 
@@ -252,13 +256,13 @@ class Toshiba_HVAC(mqtt.Mqtt):
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('sensor', object_id, config)
+    self.discovery_create_control('sensor', default_entity_id, config)
     # TIMER_ON sensor
-    object_id = unique_name + "_timer_on"
+    default_entity_id = unique_name + "_timer_on"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Start Timer",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Start Timer",
       "icon": "mdi:timer-play-outline",
       "availability_topic": f"{self.topic_prefix}/connection_state",
       "state_topic": f"{self.topic_prefix}/TIMER_ON",
@@ -269,13 +273,13 @@ class Toshiba_HVAC(mqtt.Mqtt):
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('binary_sensor', object_id, config)
+    self.discovery_create_control('binary_sensor', default_entity_id, config)
     # TIMER_OFF sensor
-    object_id = unique_name + "_timer_off"
+    default_entity_id = unique_name + "_timer_off"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Stop Timer",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Stop Timer",
       "icon": "mdi:timer-stop-outline",
       "availability_topic": f"{self.topic_prefix}/connection_state",
       "state_topic": f"{self.topic_prefix}/TIMER_OFF",
@@ -286,39 +290,55 @@ class Toshiba_HVAC(mqtt.Mqtt):
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('binary_sensor', object_id, config)
-    # Last_refresh sensor
-    object_id = unique_name + "_last_refresh"
+    self.discovery_create_control('binary_sensor', default_entity_id, config)
+    # WIFI_LED selector
+    default_entity_id = unique_name + "_wifi_led"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Last Full Refresh",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} WiFi LED",
+      "icon": "mdi:wifi-cog",
+      "availability_topic": f"{self.topic_prefix}/connection_state",
+      "command_topic": f"{self.topic_prefix}/WIFI_LED/set",
+      "state_topic": f"{self.topic_prefix}/WIFI_LED/state",
+      "options": ["OFF", "SLOW", "FAST", "ON"],
+      "device": {
+        "identifiers": unique_name
+      }
+    }
+    self.discovery_create_control('select', default_entity_id, config)
+    # Last_refresh sensor
+    default_entity_id = unique_name + "_last_refresh"
+    config = {
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Last Full Refresh",
       "icon": "mdi:eye-refresh",
       "state_topic": f"{self.topic_prefix}/last_refresh",
       "device": {
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('sensor', object_id, config)
+    self.discovery_create_control('sensor', default_entity_id, config)
     # Log messages sensor
-    object_id = unique_name + "_log_message"
+    default_entity_id = unique_name + "_log_message"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Log Message",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Log Message",
       "icon": "mdi:format-list-bulleted-type",
       "state_topic": f"{self.topic_prefix}/log_message",
       "device": {
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('sensor', object_id, config)
+    self.discovery_create_control('sensor', default_entity_id, config)
     # Connection state sensor
-    object_id = unique_name + "_connection_state"
+    default_entity_id = unique_name + "_connection_state"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Connection State",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Connection State",
       "state_topic": f"{self.topic_prefix}/connection_state",
       "payload_on": "online",
       "payload_off": "offline",
@@ -327,13 +347,13 @@ class Toshiba_HVAC(mqtt.Mqtt):
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('binary_sensor', object_id, config)
+    self.discovery_create_control('binary_sensor', default_entity_id, config)
     # Refresh button
-    object_id = unique_name + "_refresh"
+    default_entity_id = unique_name + "_refresh"
     config = {
-      "object_id": object_id,
-      "unique_id": object_id,
-      "name": f"{self.room_name} HVAC Refresh States",
+      "default_entity_id": default_entity_id,
+      "unique_id": default_entity_id,
+      "name": f"{name} Refresh States",
       "icon": "mdi:refresh",
       "command_topic": f"{self.topic_prefix}/last_refresh",
       "payload_press": "-",
@@ -341,7 +361,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
         "identifiers": unique_name
       }
     }
-    self.discovery_create_control('button', object_id, config)
+    self.discovery_create_control('button', default_entity_id, config)
     self.log_main("Discovery config created")
 
   # Subscribe to MQTT topics and register its listeners
@@ -357,10 +377,18 @@ class Toshiba_HVAC(mqtt.Mqtt):
       if (state == "TEMP_INDOOR" or state == "TEMP_OUTDOOR" or "TIMER_" in state):
         continue # indoor/outdoor temp and timer cannot be set
       else:
-        topic = self.topic_prefix + "/" + state + "/set" # set for "MQTT Climate"
-      self.mqtt_subscribe(topic, namespace="mqtt")
+        topic = self.topic_prefix + "/" + state + "/set" # set command from "MQTT Climate"
+      self.mqtt_subscribe(topic, namespace="mqtt") # subscribe own topic
       self.listen_event(self.event_received, "MQTT_MESSAGE", topic=topic, namespace="mqtt", state=state)
       self.log_debug(f"Subscribed and registered listener for: {topic}")
+      # linked HVAC
+      if (self.topic_prefix_linked is not None):
+        if (state == "POWER_SEL"):
+          # link power selection
+          topic = self.topic_prefix_linked + "/" + state + "/set" # set command from linked MQTT topic
+          self.mqtt_subscribe(topic, namespace="mqtt") # subscribe linkded topic
+          self.listen_event(self.event_received, "MQTT_MESSAGE", topic=topic, namespace="mqtt", state=state, linked=True)
+          self.log_main(f"Subscribed and registered listener for LINKED: {topic}")
     self.log_main("Listeners registered")  
 
   # Forced states refresh (by HA button)
@@ -385,6 +413,11 @@ class Toshiba_HVAC(mqtt.Mqtt):
     if (not value):
       self.log_debug("Empty value, no action")
       return
+    # linked HVAC
+    if ('linked' in kwargs):
+      if (state == "UNIT_MODE" and value == "fan_only"):
+        return; # ignore linked fan mode
+      self.log_main(f"LINKED: {state}: {value}")
     self.set_state(state, value)
 
   # Control callback locking 
@@ -559,7 +592,7 @@ class Toshiba_HVAC(mqtt.Mqtt):
 
   # Get connection state / report connection state to log/MQTT
   # returns: [bool] connection state (if no arguments)
-  def connected(self, state = None):
+  def connected(self, state = None, connection_error = "-"):
     #self.log_debug(f"set_state('{connected}')") # commmented out due to log flooding
     if (state is None):
       return self.connected(self.is_connected) # just get actual state
@@ -572,9 +605,9 @@ class Toshiba_HVAC(mqtt.Mqtt):
       return True
     if (not state):
       if (self.is_connected is None):
-        self.log_main("ERROR: Can't connect") # initial connection error message
+        self.log_main(f"ERROR: Can't connect ({connection_error})") # initial connection error message
       if (self.is_connected):
-        self.log_main("ERROR: Disconnected") # disconnection message
+        self.log_main(f"ERROR: Disconnected ({connection_error})") # disconnection message
       self.is_connected = False
       topic = self.topic_prefix + "/connection_state"
       self.mqtt_publish(topic, "offline", qos=1, namespace="mqtt")
@@ -609,29 +642,32 @@ class Toshiba_HVAC(mqtt.Mqtt):
       command = 'BackLog ' + '; '.join(command) # convert to one line Backlog
     tasmota_command += urllib.parse.quote_plus(command) 
     self.log_tasmota(tasmota_command)
+    connection_error = False
     def get_response(url, retry_counter = 0):
+      nonlocal connection_error
       try:
         with urllib.request.urlopen(url, timeout=3) as response:
           result = response.read()
-      except:
+      except Exception as e:
         # response problem = retry
         retry_counter += 1
         if (retry_counter == 1):
-          self.log_tasmota(f"Connection error, immediate retry...")
+          self.log_tasmota(f"Connection error ({e}), instant retry...")
           return get_response(url, retry_counter)
         if (retry_counter == 2):
-          self.log_tasmota(f"Connection error, delayed retry...")
+          self.log_tasmota(f"Connection error ({e}), delayed retry...")
           time.sleep(2)
           return get_response(url, retry_counter)
         if (retry_counter == 3):
-          self.log_tasmota(f"Connection error")
+          self.log_tasmota(f"Connection error ({e})")
+          connection_error = e
           return False
       # response received
       return result
     result = get_response(tasmota_command)
     if (self.connected and not result):
       self.log_tasmota("ERROR: Connection failed")
-      self.connected(False) 
+      self.connected(False, connection_error) 
       return False
     self.log_tasmota("Connection success")
     self.connected(True) 
@@ -811,10 +847,16 @@ class Toshiba_HVAC(mqtt.Mqtt):
     self.temps_polling_sec = self.args['temps_polling_sec']
     self.scheduler_pin_thread = self.args['scheduler_pin_thread']
     self.topic_prefix = self.normalize_string(f"{self.topic_group}/{self.room_name}")
+    # linked HVAC
+    if 'room_name_linked' in self.args:
+      self.room_name_linked = self.args['room_name_linked']
+      self.topic_prefix_linked = self.normalize_string(f"{self.topic_group}/{self.room_name_linked}")
     # init
     self.log_main(f"Room: {self.remove_accents(self.room_name)}") # unaccent for log
     self.log_debug(f"MQTT topic prefix: {self.topic_prefix}")
     self.log_debug(f"Tasmota host: {self.tasmota_host}")
+    if self.room_name_linked is not None:
+      self.log_main(f"Linked HVAC: {self.remove_accents(self.room_name_linked)}") # unaccent for log
     self.discovery_config()
     self.register_listeners()
     self.log_main("Initial states reading...")
